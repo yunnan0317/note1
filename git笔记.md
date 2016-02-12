@@ -41,7 +41,7 @@
 
 4. 添加远程仓库
 
-        git remote origin git@github.com:yunnan0317/app_name.git
+        git remote add origin git@github.com:yunnan0317/app_name.git
         git push -u origin --all
 
 

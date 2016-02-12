@@ -294,3 +294,129 @@ app/helpers/application_helper.rb
     <title><%= full_title(yield(:title)) %></title>
 
 # 5.1 添加一些结构
+# 5.1.1 网站导航
+
+为了保证IE的兼容性, 在布局文件的<head>标签中加入.
+
+    <!--[if lt IE 9>
+      <script src="//sdnjs.cloudflare.com/ajax/libs/html5shiv/r29/html5.min.js"></script>
+    <![endif]-->
+
+同时, 加入导航栏
+
+    <body>
+      <header class="navbar navbar-fixed-top navbar-inverse">
+        <div class="container">
+          <%= link_to "sample app", '#', id: "logo" %>
+          <nav>
+            <ul class="nav navbar-nav pull-right">
+              <li><%= link_to "Home", '#' %></li>
+              <li><%= link_to "Help", '#' %></li>
+              <li><%= link_to "Login", '#' %></li>
+            </ul>
+          </nav>
+        </div>
+      </header>
+      <div class="container">
+        <%= yield %>
+      </div>
+    </body>
+
+在首页中加入按钮
+
+    <div class="center jumbotron">
+      <h1>Welcome to the Sample App</h1>
+      <h2>
+        This is the home page for the <a href="http://www.railstutorial.org/">Ruby on Rails Tutorial</a> sample application.
+      </h2>
+      <%= link_to "Sign up now!", '#', class: "btn btn-lg btn-primary" %>
+    </div>
+    <%= link_to image_tag("rails.png", alt: "Rails log"), 'http://rubyonrails.org/' %>
+
+## 5.1.2 引入Bootstrap和自定义的CSS
+
+将bootstrap-sass-3.2.0.0添加到gemfile中
+
+新建一个SCSS文件, 用custom.css.scss命名.
+
+    @import "/bootstrap_home_path/bootstrap-sprockets";
+    @import "/bootstrap_home_path/bootstrap";
+    /* mixins, variables, etc. */
+    $gray-medium-light: #eaeaea;
+    /* universal 全局布局 */
+    html {
+      overflow-y: scroll;
+    }
+    body {
+      padding-top: 60px;
+    }
+    section {
+      overflow: auto;
+    }
+    textarea {
+      resize: vertical;
+    }
+    .center {
+      test-align: center;
+      h1 {
+        margin-bottom: 10px;
+      }
+    }
+    /* typography */
+    h1, h2, h3, h4, h5, h6 {
+      line-height: 1;
+    }
+    h1 {
+      font-size: 3em;
+      letter-spacing: -2px;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    h2 {
+      font-size: 1.2em;
+      letter-spacing: -1px;
+      margin-bottom: 30px;
+      text-align: center;
+      font-weight:normal;
+      color: $gray-light;
+    }
+    p {
+      font-size: 1.1em;
+      line-height: 1.7em;
+    }
+    /* header */
+    #logo {
+      float:left;
+      margin-right: 10px;
+      font-size: 1.7em;
+      color: white;
+      text-transform: uppercase;
+      letter-spacing: -1px;
+      padding-top: 9px;
+      font-weight: bold;
+      &:hover {
+        color: white;
+        text-decoration: none;
+      }
+    }
+    /* footer */
+    footer {
+      margin-top: 45px;
+      padding-top: 5px;
+      border-top: 1px solid $gray-medium-light;
+      color: $gray-light;
+      a {
+        color: $gray;
+        &:hover {
+          color: $gray-darker;
+        }
+      }
+      small {
+        float: right;
+        list-style: none;
+        li {
+          float: left;
+          margin-left: 15px;
+        }
+      }
+    }
