@@ -180,3 +180,63 @@ TDD流程是先编写一个失败测试, 通过修改代码使测试通过, 按�
     end
 
 ## 3.4.2 添加页面标题(变绿)
+
+以home页面为例,help和about界面也是同样的.
+
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Home | Ruby on Rails Tutorial Sample App</title>
+      </head>
+      <body>
+        <h1>Sample App</h1>
+        <p>
+          This is the home pages for the <a href="http://www.railstutorial.org/">Ruby on Rails Tutorial</a> sample application.
+        </p>
+      </body>
+    </html>
+
+
+## 3.4.3 布局和嵌入式Ruby(重构)
+
+重构的必要性
+1. 页面的标题几乎是一模一样, 每个标题中都有个"Ruby on Rails Tutorial Sample App";
+2. 整个HTML结构在每个页面都重复地出现了.
+
+以home页面为例, 其他页面也相似.
+
+    <% provide(:title, "Home") %>
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title><%= yield(:title) %> | Ruby on Rails Tutorial Sample App</title>
+      </head>
+      <body>
+        <h1>Sample App</h1>
+        <p>This is the home page for the <a href="http://www.railstutorial.org/">Ruby on Rails Tutorial</a> sample application.</p>
+      </body>
+    </html>
+
+抽出相同结构构成模板.
+
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title><%= yield(:title) %> | Ruby on Rails Tutorial Sample App</title>
+        <%= stylesheet_link_tag 'application', media: 'all', 'data-turbolink-track' => true %>
+        <%= javascript_include_tag 'application', 'data-turbolink-track' => true %>
+        <%= csrf_meat_tags %>
+      </head>
+      <body>
+        <%= yield %>
+      </body>
+    </html>
+
+stylesheet\_link\_tag用于引入样式表, 而javascript\_include\_tag用于引入JavaScript文件, csrf\_meta\_tag用于避免"跨站请求伪造"(Corss-Site Requset Forgery).
+
+相应的, 页面文件中不需要完整的HTML结构, 做出相应调整(仍以Home页面为例).
+
+    <% provide(:title, "Home") %>
+    <h1>Sample App</h1>
+    <p>This is the home pages for the <a href="http://www.railstutorial.org/">Ruby on Rails Tutorial</a> sample application.</p>
+
