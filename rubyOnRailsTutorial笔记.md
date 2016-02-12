@@ -240,3 +240,57 @@ stylesheet\_link\_tag用于引入样式表, 而javascript\_include\_tag用于引
     <h1>Sample App</h1>
     <p>This is the home pages for the <a href="http://www.railstutorial.org/">Ruby on Rails Tutorial</a> sample application.</p>
 
+## 3.4.4 设置根路由
+
+将home设置为根路由
+
+    Rails.applicationController.routes.draw do
+      root 'static_pages#home'
+      get 'static_pages/help'
+      get 'static_pages/about'
+    end
+
+# 3.5 小结
+# 3.6 练习
+
+1. 加入通用标题的控制器测试
+
+        class StaticPagesControllerTest < ActionController::TestCase
+          def setup
+            @base_title = "Ruby on Rails Tutorial Sample App"
+          end
+          testCase "should get home" do
+            get :home
+            assert_response :success
+            assert_select "title", "Help | #{@base_title}"
+          end
+          ...
+        end
+
+2. 新建联系页面
+
+# 3.7 高级测试技术
+
+# 4.1 导言, 第一个辅助方法
+
+app/helpers/application_helper.rb
+
+    module ApplicationHelper
+      # 根据所在页面返回完整的标题
+      def full_title(page_title = '')
+        base_title = "Ruby on Rails Tutorial Sample App"
+        if page_title.empty?
+          base_title
+        else
+          "#{page_title} | #{base_title}"
+        end
+      end
+    end
+
+这样的话需要简化布局.
+
+    <title><%= yield(:title) %> | Ruby on Rails Tutorial Sample App</title>
+改成
+    <title><%= full_title(yield(:title)) %></title>
+
+# 5.1 添加一些结构
