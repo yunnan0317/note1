@@ -420,3 +420,69 @@ app/helpers/application_helper.rb
         }
       }
     }
+
+# 5.3 布局中的链接
+
+对于链接, 可以使用硬编码链接
+
+    <a href="/static_pages/about">About</a>
+
+Rails习惯使用具名路由制定链接地址
+
+    <%= link_to "About", about_path %>
+
+## 5.3.1 Contact页面
+## 5.3.2 Rails路由
+
+对于根路由, 可以使用"控制器名称#动作名称"定义
+
+    root 'static_pages#home'
+
+同样的原理, 可以为每个页面定义具名路由
+
+    get 'help' => 'static_pages#help'
+
+这样就可以在布局文件中使用具名路由.
+
+## 5.3.3 使用具名路由
+
+## 5.3.4 布局中的链接测试(集成测试)
+
+1. 访问根路由(首页)
+2. 确认使用正确的模板渲染
+3. 检查指向首页, "帮助"页面, "关于"页面和"联系"页面的地址是否正确
+
+        require 'test_helper'
+        class SiteLayoutTest < ActionDispatch::IntegrationTest
+          test "layout links" do
+            get root_path
+            asserttemplate 'static_pages/home'
+            assert_select "a[href=?]", root_path, count:2
+            assert_select "a[href=?]", help_path
+            assert_select "a[href=?]", about_path
+            assert_select "a[href=?]", contact_path
+          end
+        end
+
+# 5.4 用户注册
+
+## 5.4.1 用户控制器
+
+新建用户控制器, 控制器为大写复数
+
+    rails generate controller Users new
+
+用户控制器测试
+
+
+## 5.4.2 "注册"页面的URL
+
+新建用户分配具名路由
+
+    get 'signup' => 'users#new'
+
+# 5.6 练习
+1. 将css改写为scss
+2. 在集成测试中使用get方法访问"注册"页面, 确认这个页面有正确的标题.
+3. 测试辅助方法(在测试辅助文件中引入应用的辅助方法)
+
