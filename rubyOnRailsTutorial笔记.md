@@ -504,3 +504,102 @@ Rails习惯使用具名路由制定链接地址
 
 ## 6.1.2 模型文件
 ## 6.1.3 创建用户对象
+## 6.1.4 查找用户对象
+## 6.1.5 更新用户对象
+# 6.2 用户数据验证
+
+## 6.2.1 有效性测试
+
+模型验证是TDD的绝佳时机. 编写用户模型测试
+
+    require 'test_helper'
+    class UserTest < ActiveSupport::TestCase
+      def setup
+        @user = User.new(name: "Example User", email: "user@example.com")
+      end
+      test "should be valid" do
+        assert @user.valid?
+      end
+    end
+
+## 6.2.2 存在性测试
+
+在测试中加入
+
+    test "name should be present" do
+      @user.name = "   "
+      assert_not @user.valid?
+    end
+
+更改model/user来使验证通过
+
+    class User < ActiveRecord::Base
+      validates :name, presence: true
+    end
+
+同样的更改email
+
+## 6.2.3 长度验证
+
+添加长度验证测试
+
+    test "name should not be too long" do
+      @user.name = "a" * 51
+      assert_not @user.valid?
+    end
+    test "email should not be too long" do
+      @user.email = "a" * 256
+      assert_not @user.valid?
+    end
+
+更改model/user来使验证通过
+
+    class User < ActiveRecord::Base
+      validates :name, presence: true, length: { maximum: 50}
+      validates :email, presence: true, length: { maximum: 255}
+    end
+
+## 6.2.4 格式验证
+
+增加email格式验证测试
+
+    test "email validation should accept valid addresses" do
+      valid_addresses = %w[user@example.commit USER@foo.COM A_US@foo.bar.org first.last@foo.jp alice+bob@baz.cn]
+      valid_addresses.each do |valid_address|
+        @user.email = valid_address
+        assert @user.valid?, "#{valid_address.inspect} should be valid"
+      end
+    end
+
+更改model/user通过测试
+
+    VALID_EMAIL_REGEX = /\A[\w+\-.]+@[z-z\d\-.]+\.[a-z]+\z/i
+    validates :email, presence: true, length: { maximum: 255 }, format: {with: VALID_EMAIL_REGEX}
+
+## 6.2.5 唯一性验证
+
+加入email唯一性测试
+
+    test "email addresses should be unique" do
+      duplicate_user = @user.dup
+      @user.save
+      assert_not duplicate_user.valid?
+    end
+
+model/user中加入唯一性验证已通过测试
+
+    validates :email, presence: true, length: { maximum: 255 }, format: { with: VALID_EMAIL_REGEX }, uniqueness: true
+
+测试唯一性不区分大小写
+
+    test "email addresses should be unique" do
+      duplicate_user = @user.dup
+      duplicate_user.email = @user.email.upcase
+      @user.save
+      assert_not duplicate_user.valid?
+    end
+
+再次更改model/user来再次通过验证
+
+    valadates :email, presence: true, length: { maximum: 255 }, format: { with: VALID_EMAIL_REGEX }, uniqueness: { case_sensitive: false}
+
