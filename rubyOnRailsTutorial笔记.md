@@ -486,3 +486,21 @@ Rails习惯使用具名路由制定链接地址
 2. 在集成测试中使用get方法访问"注册"页面, 确认这个页面有正确的标题.
 3. 测试辅助方法(在测试辅助文件中引入应用的辅助方法)
 
+# 6.1 用户模型
+
+新建分支
+
+    git checkout -b modeling-users
+
+## 6.1.1 数据库迁移
+
+生成用户模型, 模型为大写单数, 控制器为大写复数
+
+    rails generate model User name:string email:string
+
+会自动生成迁移文件, 使用rake进行迁移, 使用db:rollback回滚
+
+    bundle exec rake db:migrate
+
+## 6.1.2 模型文件
+## 6.1.3 创建用户对象
