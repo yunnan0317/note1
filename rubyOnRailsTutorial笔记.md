@@ -603,3 +603,63 @@ model/user中加入唯一性验证已通过测试
 
     valadates :email, presence: true, length: { maximum: 255 }, format: { with: VALID_EMAIL_REGEX }, uniqueness: { case_sensitive: false}
 
+但是存在一个问题, Active Record中的唯一性无法保证数据库中的唯一性, 为了解决这个问题, 在数据库中为email建立索引, 然后为索引加上唯一性限制.
+
+    rails generate migration add_index_to_users_email
+
+实现唯一性的数据迁移没有事先定义好的模板, 需要手动迁移
+
+    calss AddIndexToUsersEmail < ActiveRecord::Migration
+      def change
+        add_index :users, :email, unique:true
+      end
+    end
+
+然后迁移数据库
+
+    bundle exec rake db:mirate
+
+迁移会自动生成test/fixtrue可能会影响测试, 可以将内容注释掉.
+
+有些数据库适配器的索引区分大小写, 为了保证电子邮件的唯一性, 统一使用小写形式, 使用"回调"(callback, 在Active Record对象生命周期的特定时刻调用), 我们此刻要用的是before_save(初步实现, 8.4会使用常用的"方法引用"定义回调).
+
+    before_save { self.email = self.email.downcase }
+
+# 6.3 添加安全密码
+
+## 6.3.1 计算密码哈希值
+
+rails中的安全密码机制由has_secure_password实现, 要求对应模型中有个名为password_digest的属性, 添加这个属性
+
+     rails generate migration add_password_digest_to_users password_digest:string
+
+生成这个migration会自动生成完整的迁移, 只需要
+
+    bundle exec rake db:migrate
+
+has\_secure\_password使用bcrypt哈希算法计算密码摘要, 为了在演示中使用bcrypt, 要把bcrypt gem天价到gemfile中.
+
+## 6.3.2 用户有安全的密码
+
+在用户模型中加入`has_scure_password`方法, 但是无法通过测试, 这时因为测试中却少`passwor`和`password_confirmation`这两个虚拟属性, 加入这两个属性后通过测试.
+
+## 6.3.3 最短密码长度
+
+加入最短密码测试
+
+    test "password should have a minimum length" do
+      @user.password = @user.password_confirmation = "a" * 5
+      assert_not @user.valid?
+    end
+
+在用户模型中加入`validate :password, length: { minimum: 6 }`, 测试通过.
+
+## 6.3.4 创建并认证用户
+# 6.4 小结
+
+## 6.4.1 读完本章学到了什么
+
+# 6.5 练习
+1. 为上文的把电子邮件地址转换为小写编写测试(使用reload从数据库中读取)
+2. 使用downcase!直接修改email来使数据库中确实使用小写保存, 进行测试
+3. 避免出现连续点号, TDD.
