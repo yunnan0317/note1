@@ -298,6 +298,7 @@ app/helpers/application_helper.rb
 
     <title><%= yield(:title) %> | Ruby on Rails Tutorial Sample App</title>
 改成
+
     <title><%= full_title(yield(:title)) %></title>
 
 # 5.1 添加一些结构
@@ -1119,3 +1120,142 @@ pluralize方法是用来保证单复数正确的方法. 调整一下错误消息
 
 4. 使用content_tag辅助方法来简化错误消息代码
 
+# 8.1 会话
+
+  HTTP协议没有状态, 每个请求都是独立的事物, 无法使用之前请求中的信息. 所以在HTTP协议中无法在两个页面记住用户的身份. 需要用户登陆的应用都需要使用"会话"(session). 会话是两台电脑之间版永久性链接. 可以把会话看成符合REST架构的资源(与用户资源不同).
+
+## 8.1.1 会话控制器
+
+  登陆和退出功能由会话控制器中的相应动作处理, 登陆表单在new动作中处理, 登陆的过程是create动作发送POST请求, 退出则是destroy动作发送DELETE请求.
+  首先, 要生成会话控制器
+
+      rails generate controller Sessions new
+
+  添加会话控制器的路由
+
+        Rails.application.routes.draw do
+          ...
+          get 'login' => 'sessions#new'
+          post 'login' => 'sessions#create'
+          delete 'logout' => 'sessions#destroy'
+        end
+
+## 8.1.2 登陆表单
+
+  定义好控制器和路由之后, 要编写新的会话视图, 也就是登陆表单.
+  如果提交的登陆信息无效, 需要重新渲染登陆页面, 并显示一个错误消息. 与7.3.3节的错误消息不同, 那些消息是由ActiveRecord提供的, 而session不是ActiveRecord对象, 因此要使用flash渲染登陆时的错误消息.
+  signup表单中使用`form_for`作为参数, 并且把用户实例变量@user传给`form_for`
+      <%= form_for(@user) do |f| %>
+        ...
+      <% end %>
+
+  login表单不同于signup表单, 因为session不是模型,`form_for(@user)`的作用是让表单向/users发起POST请求, 对于会话来说, 我们需要指明资源的名字以及影响的URL: `form_for(:session, url: login_path)`
+
+    <% provide(:title, "Log in" %>
+    <h1>Log in</h1>
+    <div class="row">
+      <div class="col-md-6 col-md-offset-3">
+        <%= form_for(:session, url: login_path) do |f| %>
+          <%= f.label :email %>
+          <%= f.text_field :email %>
+          <%= f.label :password %>
+          <%= f.password_field :password %>
+          <%= f.submit "Log in", class: "btn btn-primary" %>
+        <% end %>
+        <p>New user? <%= link_to "Sign up now!", signup_path %></p>
+      </div>
+    </div>
+
+## 8.1.3 查找并认证用户
+
+  和signup表单类似, login表单所提交的参数是一个嵌套hash, 具体而言, params包含了这些内容: `{ session: { password: "foobar", email: "user@exapmle"} }`
+
+    class SessionsController < ApplicationController
+      # 填写表单时的动作
+      def new
+      end
+      # 提交表单时的动作
+      def create
+        user = User.find_by(email: params[:sessions][:email].downcase)
+        if user && user.authenticate(params[:sessions][password])
+          # 登陆之后动作
+        else
+          # 创建一个错误消息
+          render 'new'
+        end
+      end
+      # 退出时的动作
+      def destroy
+      end
+    end
+
+## 8.1.4 渲染闪现消息
+
+  在signup模型验证中, 错误消息闪现关联在某个ActiveRecord对象上, 因为会话不是ActiveRecord模型, 不能使用这种方式了.
+
+    class SessionsController < ApplicationController
+      # 填写表单时的动作
+      def new
+      end
+      # 提交表单时的动作
+      def create
+        user = User.find_by(email: params[:sessions][:email].downcase)
+        if user && user.authenticate(params[:sessions][password])
+          # 登陆之后动作
+        else
+          # falsh.now用于渲染当前页面的闪现信息
+          flash.now[:danger] = "Invalid email/password combination"
+          render 'new'
+        end
+      end
+      # 退出时的动作
+      def destroy
+      end
+
+    end
+
+## 8.1.5 测试闪现消息
+
+    rails generate integration_test user_login
+
+基本测试步骤:
+
+1. 访问登陆页面
+2. 确认正确渲染了登陆表单
+3. 提交无效的params哈希, 向登陆页面发起post请求
+4. 确认重新渲染了登陆表单, 而且显示了一个闪现消息
+5. 访问其他页面
+6. 当前页面无闪现消息
+
+        class UsersLoginTest < ActionDispatch::IntegrationTest
+          test "login with invalid information" do
+            get login_path
+            assert_template 'sessions/new'
+            post login_path, session: { email: "", password: "" }
+            assert_template 'sessions/new'
+            assert_not flash.empty?
+            get root_path
+            assert flash.empty?
+          end
+        end
+
+# 8.2 登陆
+
+在生成session控制器的时候, rails会自动生成一个辅助方法文件, 叫做SessionsHelper. 其中的辅助方法可以自动在引入rails视图, 如果在控制器基类ApplicationController中引入session辅助方法, 可以在控制器中使用辅助方法.
+
+    class ApplicationController < ActionController::Base
+      protext_from_forgery with: :exception
+      # 引入session辅助方法
+      include SessionsHelper
+    end
+
+## 8.2.1 log_in方法
+
+    module SessionsHelper
+      # 登入指定用户
+      def log_in(user)
+        session[:user_id] = user.id
+      end
+    end
+
+session创建的临时cookie会自动加密, 所以上面的代码是安全的, 攻击者无法使用会话中的
