@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # 3.1 创建演示应用
 
 1. 创建新引用
@@ -1258,4 +1259,317 @@ pluralize方法是用来保证单复数正确的方法. 调整一下错误消息
       end
     end
 
-session创建的临时cookie会自动加密, 所以上面的代码是安全的, 攻击者无法使用会话中的
+session创建的临时cookie会自动加密, 所以上面的代码是安全的, 攻击者无法使用会话中的, 不过只有session方法创建的临时cookie是这样的, cookies方法创建的久cookie则有可能会受到"会话劫持".
+
+使用log_in方法完成会话控制器中的create动作, 完成登入用户, 然后重定向到用户资料页面.
+
+    class SessionsController < ApplicationController
+       def new
+       end
+
+       def create
+         user = User.find_by(email: params[:session][:email].downcase)
+         if user && user.authenticate(params[:session][:password])
+           log_in user
+           redirect_to user
+         else
+           flash.now[:danger] = 'Invalid email/password combination'
+           render 'new'
+         end
+       end
+
+       def destroy
+       end
+    end
+
+## 8.2.2 当前用户
+
+目前已经把用户的ID安全的存储在临时会话中, 可以在后续请求中读取出来, 邀请已一个current_user的方法, 从数据库中取出用户ID对应的用户.
+注意不能使用find方法, 因为如果用户ID不存在, find方法会抛出异常. 使用find_by方法不会跑出异常, 会返回nil
+
+    module SesionsHelper
+      # 登入指定用户
+      def log_in(user)
+        session[:user_id] = user.id
+      end
+
+      # 返回当前登陆的用户(如果有的话)
+      def current_user
+        @current_user ||= User.find_by(id: session[:user_id])
+      end
+    end
+
+## 8.2.3 修改布局中的链接
+
+首先需要定义logged_in?方法, 返回布尔值.
+
+    module SesionsHelper
+      # 登入指定用户
+      def log_in(user)
+        session[:user_id] = user.id
+      end
+
+      # 返回当前登陆的用户(如果有的话)
+      def current_user
+        @current_user ||= User.find_by(id: session[:user_id])
+      end
+
+      # 如果用户已登陆, 返回true, 否则返回false
+      def logged_in?
+        !current_user.nil?
+      end
+    end
+
+定义好了logged_in?方法后, 就可以修改布局中的链接了
+
+    <header class="navbar navbar-fixed-top navbar-inverse">
+        <div class="container">
+            <%= link_to "sample app", root_path, id: "logo" %>
+            <nav>
+                <ul calss="nav navbar-nav pull-right">
+                    <li><%= link_to "Home", root_path %></li>
+                    <li><%= link_to "Help", help_path %></li>
+                    <% if logged_in? %>
+                      <li><%= link_to "Users", '#' %></li>
+                      <li class="dropdown">
+                          <a href="#" class="dropdown-toggle" data-toggle="dropdown">Account <b class="caret"></b>
+                          </a>
+                          <ul>
+                              <li><%= link_to "Profile", current_user %></li>
+                              <li><%= link_to "Settings", '#' %></li>
+                              <li class="divider"></li>
+                              <li>
+                                  <%= link_to "Log out", logout_path, method: "delete" %>
+                              </li>
+                          </ul>
+                      </li>
+                    <% else %>
+                      <li>
+                          <%= link_to "Log in", login_path %>
+                      </li>
+                    <% end %>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+为了实现下拉菜单效果, 需要引入Bootstrap JavaScript库. 注意要在引入bootstrap前引入jquery和jquery_ujs.
+
+    //= require jquery
+    //= require jquery_ujs
+    //= require bootstrap
+    //= require turbolinks
+    //= require_tree .
+
+## 8.2.4 测试布局中的变化
+
+本节要测试登陆成功后布局的变化, 具体要求为:
+
+1. 访问登陆页面
+2. 通过post请求发送有效的登陆信息
+3. 确认登陆链接消失了
+4. 确认出现了退出链接
+5. 确认出现了资料页面链接
+
+要实现这样的测试, 在数据库中必须有一个用户, Rails默认使用fixtrue来实现这种需求, fixtrue是一种组织数据的方式, 这些数据会载入测试数据库.
+密码叉腰使用bcrypt生成(通过`has_secure_pasword`方法), 所以固件中也使用这种方法生成. 可以查看安全密码的源码, 得到生成摘要的方法:`BCrypt::Password.create(string, cost: cost)`. 其中, string是要计算hash值的字符, cost是耗时因子. 耗时因子越大, hash值被破解的难度越大. 但在测试中, 希望digest方法执行越快越好, 因此安全密码的源码中还有这么一行: `cost = ActiveModel::SecurePassword.mini_cost ? BCrypt::Engine::MIN_COST : BCrypt::Engine.cost`
+
+定义fixtrue中使用的digest方法
+
+    class User < ActiveRecord
+      before_save { self.email = email.downcase }
+      validates :name, presence: true, length: { maximum: 50 }
+      VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+\.[a-z]+\z/i
+      validates :email, presence: true, length: { maximum: 255 },
+                        format: { with: VALID_EMAIL_REGEX }
+                        uniqueness: { case_sensitive: false }
+      has_secure_password
+      validates :password, length: { minimum: 6 }
+
+      # 返回指定字符串的hash摘要
+      def User.digest(string)
+        cost = ActiveModel::SecurePassword.min_cost ? BCrypt::Engine::MIN_COST : BCrypt::Engine.cost
+        BCrypt::Password.create(string, cost: cost)
+      end
+    end
+
+测试用户登陆所需的fixtrue
+
+    michael:
+      name: Michael Example
+      email: michael@example.com
+      password_digest: <%= User.digest('password') %>
+
+在创建了有效的fixtrue以后, 可以使用`user = users(:michael)`来获取这个用户. 虽然定义了`has_secure_password`需要的`password_digest`属性, 但有时需要密码的原始值, 但是在fixtrue中无法实现, 如果尝试添加password属性, Rails会提示数据库中没有这个列, 所以我们约定固件中所有用户的密码都一样, 即`password`. 接下来就可以编写测试了, 先测试使用有效信息登陆的情况.
+
+    require 'test_helper'
+    class UsersLoginTest < ActionDispatch::IntegrationTest
+
+      def setup
+        # 获取fixtrue中的测试用户信息
+        @users = users(:michael)
+      end
+
+      ...
+
+      test "login with valid information" do
+        # 访问登陆页面
+        get login_path
+        # 使用fixtrue中的测试用户信息登陆
+        post login_path, session: { email: @user.email, password: 'password' }
+        # 测试登陆成功后是否转向用户页面
+        assert_redirected_to @users
+        # 访问重定向页面
+        follow_redirect!
+        # 测试是否渲染用户页面
+        assert_template 'users/show'
+        # 测试当前页面没有登陆链接
+        assert_select "a[href=?]", login_path, count:0
+        # 测试当前页面含有登出链接
+        assert_select "a[href=?]", logout_path
+        # 测试当前页面含有用户页面链接
+        assert_select "a[href=?]", user_path(@user)
+      end
+    end
+
+## 8.2.5 注册后直接登陆
+
+之前的注册页面成功后没有登陆, 现在要实现注册后直接登陆的功能, 只需在用户控制器的create动作中调用log_in方法.
+
+    class UsersController < ApplicationController
+      def show
+        @user = User.find(params[:id])
+      end
+
+      def new
+        @user = User.new
+      end
+
+      def create
+        @user = User.new(user_params)
+        if @user.save
+          # 注册成功后自动登陆
+          log_in @user
+          flash[:success] = "Welcome to the Sample App!"
+          redirect_to @user
+        else
+          render 'new'
+        end
+      end
+
+      private
+        def user_params
+          params.require(:user).permit(:name, :email, :password, :password_confirmation)
+        end
+    end
+
+为了测试这个功能, 可以在test_helper中加入测试辅助方法`is_logged_in?`来测试
+
+    ENV['RAILS_ENV'] ||= 'test'
+    ...
+    class ActiveSupport::TestCase
+      firtures :all
+
+      # 如果用户已登陆, 返回true
+      def is_logged_in?
+        !session[:user_id].nil?
+      end
+    end
+
+然后, 可以在注册成功的测试中加入对用户是否登陆的测试
+
+    require 'test_helper'
+
+    class UserSignTest < ActionDispatch::IntegrationTest
+      ...
+      test "valid signup information" do
+        # 访问注册页面
+        get signup_path
+        # 测试发送注册信息后已注册用户数量是否变化
+        assert_difference 'User.count', 1 do
+          post_via_redirect user_path, user: {
+            name: "Example User",
+            email: "user@example.com",
+            password: "password",
+            password_confirmation: "password"
+          }
+        end
+        # 测试注册成功后是否转向用户页面
+        assert_template 'users/show'
+        # 测试是否已经自动登陆
+        assert is_logged_in?
+      end
+    end
+
+# 8.3 退出
+首先编写辅助方法log_out
+
+    module SessionsHelper
+      # 登入指定的用户
+      def log_in(user)
+        session[:user_id] = user.id
+      end
+
+      ...
+
+      def log_out
+        # 从session中删除用户
+        session.delete(:user_id)
+        # 清空current_user
+        @current_user = nil
+      end
+    end
+
+销毁会话, 退出用户
+
+    class SessionsController < ApplicationController
+      def new
+      end
+
+      def create
+        user = User.find_by(email: params[:session][:email].downcase)
+        if user && user.authenticate(params[:session][:password])
+          log_in user
+          redirect_to user
+        else
+          falsh.now[:danger] = 'Invalid email/password combination'
+          render 'new'
+        end
+      end
+
+      def destroy
+        # 登出用户
+        log_out
+        # 重定向至根地址
+        redirect_to root_url
+      end
+    end
+
+加入测试退出的内容
+
+    require 'test_helper'
+
+    class UsersLoginTest < ActionDispatch::IntegrationTest
+
+      ...
+
+      test "login with valid information followed by logout" do
+        get login_path
+        post login_path, session: { email: @user.email, password: 'password'}
+        assert is_logged_in?
+        assert_redirected_to @user
+        follow_redirect!
+        assert_template 'users/show'
+        assert_select "a[href=?]", login_path, count: 0
+        assert_select "a[href=?]", logout_path
+        assert_select "a[href=?]", user_path(@user)
+        delete logout_path
+        assert_not is_logged_in?
+        assert_redirected_to root_url
+        follow_redirect!
+        assert_select "a[href=?]", login_path
+        assert_select "a[href=?]", logout_path, count: 0
+        assert_select "a[href=?]", user_path(@usere), count: 0
+      end
+    end
+# 8.4 记住我
