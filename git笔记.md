@@ -24,7 +24,7 @@
         ssh-keygen -t rsa -C "yunnan0317@gmail.com"
 
     b. 在github中添加公钥
-    
+
     登陆github账户, 进入Accout Seetings => SSH key => Add SSH key.
     c. 测试key是否正常
 
@@ -69,3 +69,5 @@
     git reset --hard
     # 撤销最后一次提交
     git commit --ammend
+    # 查看分支
+    git branch -a

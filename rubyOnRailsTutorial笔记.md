@@ -3,10 +3,14 @@
 
 1. 创建新引用
 
+_代码清单3.1: 创建一个新应用_
+
         # 选择4.2.0创建新应用
         rails _4.2.0_ new sample_app
 
 2. 编辑gemfile
+
+_代码清单3.2: 演示应用的Gemfile_
 
         srouce 'https://ruby.taobao.org/'
         gem 'rails', '4.2.0'
@@ -44,9 +48,11 @@
         git commit -m "Initialize reopo"
 
 5. 首次推送
-  
+
         git remote add origin git@github.com:yunnan0317/app_name.git
         git push -u origin --all
+
+_代码清单3.3: 更改ReadMe文件 略_
 
 # 3.2 静态页面
 
@@ -56,8 +62,12 @@
 
 ## 3.2.1 生成静态页面
 
+_代码清单3.4: 生成静态页面控制器_
         # 约定控制器命名采用驼峰式
         rails generate controller StaticPages home help
+
+关于一些撤销操作的方法
+
         # 推送到static-pages分支
         git add -A
         git commit -m "Add a Static Pages controller"
@@ -73,12 +83,43 @@
         bundle exec rake db:migrate VERSION=0
 
 生成控制器时, rails自动生成了他们的路由文件.
+
+代码清单3.4生成的控制器会自动修改路由文件, 如代码清单3.5所示.
+
+_代码清单3.5: 静态页面控制器中home和help动作的路由 config/routes.rb_
+
+    Rails.application.routes.draw do
+      get 'static_pages/home'
+      get 'static-pages/help'
+      ...
+    end
+
+_代码清单3.6: 代码清单3.4生成的静态页面控制器 app/controllers/static\_pages\_controller.rb_
+
+    class StaticPagesController < ApplicationController
+      def home
+      end
+
+      def help
+      end
+    end
+
+_代码清单3.7: 为"首页"生成的视图 app/views/static\_pages/home.html.erb_
+
+    <h1>StaticPages</h1>
+    <p>Find me in app/views/static_pages/home.html.erb</p>
+
+_代码清单3.8: 为"帮助"页面生成的视图 app/views/static\_pages/help.html.erb_
+
+    <h1>StaticPages#help</h1>
+    <p>Find me in app/views/static_pages/help.html.erb</p>
+
 ## 3.2.2 修改静态页面中的内容
 # 3.3 开始测试
 
 什么时候测试
 
-1. 和应用代码相比, 如果测试代码特别剪短, 倾向优先编写测试;
+1. 和应用代码相比, 如果测试代码特别简短, 倾向优先编写测试;
 
 2. 如果对想实现的功能不是特别清楚, 倾向于先编写应用代码, 然后再编写测试, 改进实现的方法;
 
@@ -861,16 +902,16 @@ Rails 4.2可以使用byebug gem来获取调试信息.
         <% form_for(@user) do |f| %>
           <%= f.label :name %>
           <%= f.text_field :name %>
-          
+
           <%= f.label :email %>
           <%= f.text_field :email %>
-          
+
           <%= f.label :passowrd %>
           <%= f.text_field :password %>
-          
+
           <%= f.label :password_confirmation, "Confirmation" %>
           <%= f.text_field :password_confirmation %>
-          
+
           <%= f.submit "Create my account", class: "btn btn-primary" %>
         <% end%>
       </div>
@@ -946,16 +987,16 @@ Rails 4.2可以使用byebug gem来获取调试信息.
         <%= form_for(@user) do |f| %>
           # 渲染错误信息局部视图
           <%= render 'shared/error_messages' %>
-          
+
           <%= f.label :name %>
           <%= f.text_field :name, class: 'form-control' %>
-            
+
           <%= f.label :email %>
           <%= f.text_field :email, class: 'form-control' %>
-          
+
           <%= f.label :password %>
           <%= f.text_field :password, class: 'form-control' %>
-        
+
           <%= f.label :password_confirmation %>
           <%= f.text_field :passowrd_confirmation, class: 'form-control' %>
           <%= f.submit "Create my account", class: "btn btn-primary" %>
@@ -1047,7 +1088,7 @@ pluralize方法是用来保证单复数正确的方法. 调整一下错误消息
 
 ## 7.4.2 闪现消息
 
-    
+
     class UsersController < ApplicationController
       ...
       def create
@@ -1287,7 +1328,7 @@ session创建的临时cookie会自动加密, 所以上面的代码是安全的, 
 目前已经把用户的ID安全的存储在临时会话中, 可以在后续请求中读取出来, 邀请已一个current_user的方法, 从数据库中取出用户ID对应的用户.
 注意不能使用find方法, 因为如果用户ID不存在, find方法会抛出异常. 使用find_by方法不会跑出异常, 会返回nil
 
-    module SesionsHelper
+    module SessionsHelper
       # 登入指定用户
       def log_in(user)
         session[:user_id] = user.id
@@ -1303,7 +1344,7 @@ session创建的临时cookie会自动加密, 所以上面的代码是安全的, 
 
 首先需要定义logged_in?方法, 返回布尔值.
 
-    module SesionsHelper
+    module SessionsHelper
       # 登入指定用户
       def log_in(user)
         session[:user_id] = user.id
@@ -1510,8 +1551,17 @@ session创建的临时cookie会自动加密, 所以上面的代码是安全的, 
         session[:user_id] = user.id
       end
 
-      ...
+      # 返回当前登陆的用户(如果有的话)
+      def current_user
+        @current_user ||= User.find_by(id: session[:user_id])
+      end
 
+      # 如果用户已登陆, 返回true, 否则返回false
+      def logged_in?
+        !current_user.nil?
+      end
+
+      # 退出当前用户
       def log_out
         # 从session中删除用户
         session.delete(:user_id)
@@ -1554,22 +1604,1760 @@ session创建的临时cookie会自动加密, 所以上面的代码是安全的, 
       ...
 
       test "login with valid information followed by logout" do
+        # 访问登陆页面
         get login_path
+        # 发送登陆信息
         post login_path, session: { email: @user.email, password: 'password'}
+        # 测试是否登陆成功
+        assert is_logged_in?
+        # 测试是否重定向到用户页面
+        assert_redirected_to @user
+        # 访问重定向后的页面
+        follow_redirect!
+        # 测试是否渲染用户页面模板
+        assert_template 'users/show'
+        # 测试用户页面中是否有登陆按钮
+        assert_select "a[href=?]", login_path, count: 0
+        # 测试用户页面中是否有退出按钮
+        assert_select "a[href=?]", logout_path
+        # 测试用户页面是否有转向用户设置的页面
+        assert_select "a[href=?]", user_path(@user)
+        # 登出当前用户
+        delete logout_path
+        # 测试是否登出
+        assert_not is_logged_in?
+        # 测试是否重定向到首页
+        assert_redirected_to root_url
+        # 访问重定向页面
+        follow_redirect!
+        # 测试是否有登陆按钮
+        assert_select "a[href=?]", login_path
+        # 测试是否有登出按钮
+        assert_select "a[href=?]", logout_path, count: 0
+        # 测试是否有用户设置按钮
+        assert_select "a[href=?]", user_path(@usere), count: 0
+      end
+    end
+
+# 8.4 记住我
+
+cookie方法实现的持久会话有被会话劫持的风险. 可以按照下列方式实现持久会话:
+
+1. 生成随机字符串, 当做记忆令牌
+2. 把这个随机令牌存入浏览器的cookie中, 并把过期时间设置为未来的某个日期
+3. 在数据库中存储令牌的摘要
+4. 在浏览器的cookie中存储加密后的用户ID
+5. 如果cookie中有用户的ID, 就用这个ID在数据库中查找用户, 并检查cookie中的记忆令牌和数据库中的hash摘要是否匹配.
+
+首先需要在用户模型中加入存储令牌摘要的列.
+
+     rails generate migration add_remember_digest_to_users remember_digest:srting
+
+运行`bundle exec rake db:migrate`.
+
+对于令牌的生成, 可以用Ruby标准库中的SecureRandom模块的urlsafe_base64方法. 这个方法返回长度为22的随机字符串, 包含字符A-Z, a-z, 0-9, -和_. 我们可以定义一个`new_token`方法, 和digest方法一样, `new_token`方法也不需要用户对象, 所以也定义为类方法.
+
+    class User < ActiveRecord::Base
+      before_save { self.email = email.downcase }
+      validates :name, presence: true, length: { maximum: 50 }
+      VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+.[a-z]+\z/i
+      validates :email, presence: true, length: {maximum: 255}, format: { with: VALID_EMAIL_REGEX }, uniqueness: { case_sensitive: false }
+      has_secure_password
+      validates :password, length: { minimum: 6 }
+
+      # 返回制定字符串的hash摘要
+      def User.digest(string)
+        cost = ActiveModel::SecurePassword.min_cost ? BCrypt::Engine::MIN_COST : BCrypt::Engine.cost
+        BCrypt::Password.create(string, cost: cost)
+      end
+
+      # 返回一个随机令牌
+      def User.new_token
+        SecureRandom.urlsafe_base64
+      end
+    end
+
+对于密码, 有一个虚拟属性password和数据库中的password\_digest, 其中password属性由has\_secure\_password方法自动创建. 而自己创建的remember\_token属性, 可以使用attr\_accessor创建一个可访问的属性.
+
+    class User < ActiveRecord::Base
+      # 创建可以访问的属性
+      attr_accessor :remember_token
+
+      before_save { self.email = email.downcase }
+      validates :name, presence: true, length: { maximum: 50 }
+      VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+.[a-z]+\z/i
+      validates :email, presence: true, length: {maximum: 255}, format: { with: VALID_EMAIL_REGEX }, uniqueness: { case_sensitive: false }
+      has_secure_password
+      validates :password, length: { minimum: 6 }
+
+      # 返回制定字符串的hash摘要
+      def User.digest(string)
+        cost = ActiveModel::SecurePassword.min_cost ? BCrypt::Engine::MIN_COST : BCrypt::Engine.cost
+        BCrypt::Password.create(string, cost: cost)
+      end
+
+      # 返回一个随机令牌
+      def User.new_token
+        SecureRandom.urlsafe_base64
+      end
+
+      # 为了持久会话, 在数据库中记住用户
+      def remember
+        self.remember_token = User.new_token
+        update_attributes(:remember_digest, User.digest(remember_token))
+      end
+    end
+
+## 8.4.2 记录登陆时的状态
+定义了user.remember方法后, 可以创建持久会话了, 方法是把加密后的用户ID和记忆令牌作为持久cookie存入浏览器. 为此要使用cookies方法, 这个方法和session方法一样, 可以视为一个hash. 一个cookie有两部分信息, value和expires.
+
+    class User < ActiveRecord::Base
+      # 创建可以访问的属性
+      attr_accessor :remember_token
+
+      before_save { self.email = email.downcase }
+      validates :name, presence: true, length: { maximum: 50 }
+      VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+.[a-z]+\z/i
+      validates :email, presence: true, length: {maximum: 255}, format: { with: VALID_EMAIL_REGEX }, uniqueness: { case_sensitive: false }
+      has_secure_password
+      validates :password, length: { minimum: 6 }
+
+      # 返回制定字符串的hash摘要
+      def User.digest(string)
+        cost = ActiveModel::SecurePassword.min_cost ? BCrypt::Engine::MIN_COST : BCrypt::Engine.cost
+        BCrypt::Password.create(string, cost: cost)
+      end
+
+      # 返回一个随机令牌
+      def User.new_token
+        SecureRandom.urlsafe_base64
+      end
+
+      # 为了持久会话, 在数据库中记住用户
+      def remember
+        self.remember_token = User.new_token
+        update_attributes(:remember_digest, User.digest(remember_token))
+      end
+
+      # 如果指定的令牌和摘要匹配, 返回true
+      def authenticate?(remember_token)
+        BCrypt::Password.new(remember_digest).is_password?(remember_token)
+      end
+    end
+
+在创建用户后, 自动登陆并记住登陆状态
+
+    class SessionsController < ApplicationController
+      def new
+      end
+
+      def create
+        user = User.find_by(email: params[:session][:email].downcase)
+        if user && user.authenticate(params[:session][:password])
+          log_in user
+          # 使用SessionHepler中的remember方法记住用户
+          remember user
+          redirect_to user
+        else
+          falsh.now[:danger] = 'Invalid email/password combination'
+          render 'new'
+        end
+      end
+
+      def destroy
+        # 登出用户
+        log_out
+        # 重定向至根地址
+        redirect_to root_url
+      end
+    end
+
+和登陆功能一样, 上面的代码把震中的工作交给SessionsHelper方法完成.
+
+    module SessionsHelper
+      # 登入指定的用户
+      def log_in(user)
+        session[:user_id] = user.id
+      end
+
+      # 在持久会话中记住用户
+      def remember(user)
+        user.remember
+        cookies.permanent.signed[:user_id] = user.id
+        cookies.permanent[:remember_token] = user.remember_token
+      end
+
+      # 返回当前登陆的用户(如果有的话)
+      def current_user
+        @current_user ||= User.find_by(id: session[:user_id])
+      end
+
+      # 如果用户已登陆, 返回true, 否则返回false
+      def logged_in?
+        !current_user.nil?
+      end
+
+      # 退出当前用户
+      def log_out
+        # 从session中删除用户
+        session.delete(:user_id)
+        # 清空current_user
+        @current_user = nil
+      end
+    end
+
+截止到目前位置, current\_user只能处理临时用户. 更新current\_user
+
+        module SessionsHelper
+      # 登入指定的用户
+      def log_in(user)
+        session[:user_id] = user.id
+      end
+
+      # 在持久会话中记住用户
+      def remember(user)
+        user.remember
+        cookies.permanent.signed[:user_id] = user.id
+        cookies.permanent[:remember_token] = user.remember_token
+      end
+
+      # 返回当前登陆的用户(如果有的话)
+      def current_user
+        if (user_id = session[:user_id])
+          @current_user ||= User.find_by(id: user_id)
+        elsif (user_id = cookies.signed[:user_id])
+          if user && user.authenticated?(cookies[:remember_token])
+            log_in user
+            @current_user = user
+          end
+        end
+      end
+
+      # 如果用户已登陆, 返回true, 否则返回false
+      def logged_in?
+        !current_user.nil?
+      end
+
+      # 退出当前用户
+      def log_out
+        # 从session中删除用户
+        session.delete(:user_id)
+        # 清空current_user
+        @current_user = nil
+      end
+    end
+
+## 忘记用户
+
+除非cookie过期, 现在无法退出用户. 在用户模型中加入forget方法
+
+    class User < ActiveRecord::Base
+      # 创建可以访问的属性
+      attr_accessor :remember_token
+
+      before_save { self.email = email.downcase }
+      validates :name, presence: true, length: { maximum: 50 }
+      VALID_EMAIL_REGEX = /\A[\w+\-.]+@[a-z\d\-.]+.[a-z]+\z/i
+      validates :email, presence: true, length: {maximum: 255}, format: { with: VALID_EMAIL_REGEX }, uniqueness: { case_sensitive: false }
+      has_secure_password
+      validates :password, length: { minimum: 6 }
+
+      # 返回制定字符串的hash摘要
+      def User.digest(string)
+        cost = ActiveModel::SecurePassword.min_cost ? BCrypt::Engine::MIN_COST : BCrypt::Engine.cost
+        BCrypt::Password.create(string, cost: cost)
+      end
+
+      # 返回一个随机令牌
+      def User.new_token
+        SecureRandom.urlsafe_base64
+      end
+
+      # 为了持久会话, 在数据库中记住用户
+      def remember
+        self.remember_token = User.new_token
+        update_attributes(:remember_digest, User.digest(remember_token))
+      end
+
+      # 如果指定的令牌和摘要匹配, 返回true
+      def authenticate?(remember_token)
+        BCrypt::Password.new(remember_digest).is_password?(remember_token)
+      end
+
+      # 忘记用户
+      def forget
+       update_attribute(:remember_digest, nil)
+      end
+    end
+
+然后就可以定义forger辅助方法, 忘记持久会话, 最后在log_out辅助方法中调用forget
+
+
+    module SessionsHelper
+      # 登入指定的用户
+      def log_in(user)
+        session[:user_id] = user.id
+      end
+
+      # 在持久会话中记住用户
+      def remember(user)
+        user.remember
+        cookies.permanent.signed[:user_id] = user.id
+        cookies.permanent[:remember_token] = user.remember_token
+      end
+
+      # 返回当前登陆的用户(如果有的话)
+      def current_user
+        @current_user ||= User.find_by(id: session[:user_id])
+      end
+
+      # 如果用户已登陆, 返回true, 否则返回false
+      def logged_in?
+        !current_user.nil?
+      end
+
+      # 忘记持久会话
+      def forget(user)
+        user.forget
+        cookies.delete(:user_id)
+        cookies.delete(:remember_token)
+      end
+
+      # 退出当前用户
+      def log_out
+        # 从session中删除用户
+        session.delete(:user_id)
+        # 清空current_user
+        @current_user = nil
+      end
+    end
+
+## 8.4.4 两个小问题
+
+1. 如果用户打开多个窗口, 在其中一个已经退出, 再在另外一个窗口中点击退出链接会导致会话错误.
+2. 用户在不同浏览器中永久登陆, 如果用户在一个浏览器中退出, 而另外一个没有退出, 因为此时user.remember_digest已经变成了nil. 而在另外一个浏览器中, 用户ID没有被删除, 会执行`user.authenticated?(cookeis[:remember_token])`表达式, `BCrypt::Password.new(remember_digest).is_password?(remember_token)`会抛出异常.
+
+可以先在集成测试中重现这两个问题.
+
+    require 'test_helper'
+    class UsersLoginTest < ActionDispatch::IntegrationTest
+      ...
+      test "login with valid information followed by logout" do
+        get login_path
+        post login_path, session: { email: @user.email, password: 'password' }
         assert is_logged_in?
         assert_redirected_to @user
         follow_redirect!
-        assert_template 'users/show'
+        assert_template 'user/show'
         assert_select "a[href=?]", login_path, count: 0
         assert_select "a[href=?]", logout_path
         assert_select "a[href=?]", user_path(@user)
         delete logout_path
         assert_not is_logged_in?
         assert_redirected_to root_url
+        # 模拟用户在另一个窗口中减低退出按钮
+        delete logout_path
         follow_redirect!
-        assert_select "a[href=?]", login_path
+        assert_select "a[href=?]", login_path,
         assert_select "a[href=?]", logout_path, count: 0
-        assert_select "a[href=?]", user_path(@usere), count: 0
+        assert_select "a[href=?]", user_path(@user), count: 0
       end
     end
-# 8.4 记住我
+第二个`delete logout_path`会抛出异常, 因为没有当前用户, 导致测试组件无法通过. 在应用代码中, 只需在`logged_in?`返回true时才调用`log_out`即可
+
+    class SessionsController < ApplicationController
+      ...
+      def destroy
+        log_out if logged_in?
+        redirect_to root_url
+      end
+    end
+
+第二个问题设计到两种不同浏览器, 直接模拟有困难, 可以直接在用户模型层测试. 只需创建一个没有`remember_digest`的用户, 在调用`authenticated?`方法.
+
+    require 'test_helper'
+    class UserTest <ActiveSupport::TestCase
+      def setup
+        @user = User.new(name: "Example User", email: "user2example.com", password: "foobar", password_confirmation: "foobar")
+      end
+      ...
+      test "authenticate? should return false for a user with nil digest" do
+        assert_not @user.authenticated?('')
+      end
+    end
+
+更新authenticated?方法, 处理没有摘要的请款
+
+    class User < ActiveRecord::Base
+      ...
+      # 如果制定的令牌和摘要匹配, 返回true
+      def authenticated?(remember_token)
+        return false is remember_digest.nil?
+        BCrypt::Password.new(remember_digest).is_password?(remember_token)
+      end
+    end
+
+## 8.4.5 记住我复选框
+
+在登陆表单中添加记住我复选框
+
+    <% provide(:title, "Log in") %>
+    <h1>Log in</h1>
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <%= form_for(:session, url: login_path) do |f| %>
+              <%= f.label :email %>
+              <%= f.text_field :email %>
+
+              <%= f.label :password %>
+              <%= f.password_field :password %>
+
+              <%= f.label :remember_me, class: "checkbox inline" do %>
+                <%= f.check_box :remember_me %>
+                <span>Remember me on this computer</span>
+              <% end %>
+              <%= f.submit "Log in", class: "btn btn-primary" %>
+            <% end %>
+
+            <p>New user? <%= link_to "Sign up now!", signup_path %></p>
+        </div>
+    </div>
+
+添加一些css样式
+
+    ...
+    /* forms */
+    ...
+    .checkbox {
+      margin-top: -10px;
+      margin-bottom: 10px;
+      span {
+        margin-left: 20px;
+        fort-weight: normal;
+      }
+    }
+
+    #session_remember_me {
+      width: auto;
+      margin-left: 0;
+    }
+
+处理提交的"记住我"复选框
+
+    class SessionController < ApplicationController
+      def new
+      end
+
+      def create
+        user = User.find_by(email: params[:session][:email].downcase)
+        if user && user.authenticated(params[:session][:password])
+          log_in user
+          # 检测是否需要记住我
+          params[:session][:remember_me] == '1' ? remember(user) : forget(user)
+          redirect_to user
+        else
+        end
+      end
+      def destroy
+        log_out if logged_in?
+        redirect_to root_url
+      end
+    end
+
+## 8.4.6 记住登陆状态功能的测试
+
+在之前的测试中, 登入用户使用post方法发送有效的session hash, 为了避免重复, 编写一个测试辅助方法, 名为`log_in_as`
+
+    EVN['RAILS_ENV'] ||= 'test'
+    ...
+    class ActiveSupport::TestCase
+      firtures :all
+
+      # 如果用户已经登陆, 返回true
+      def is_logged_in?
+        !session[:user_id].nil
+      end
+
+      # 登入测试用户
+      def log_in_as(user, options = {})
+        password = options[:password] || 'password'
+        remember = options[:remember_me] || '1'
+        if integration_test?
+          post login_path, session { email: user.email, password: password, remember_me: remember_me }
+        else
+          session[:user_id] = user.id
+        end
+      end
+
+      private
+
+      # 在集成测试中返回true
+        def integration_test?
+          defined?(post_via_redirect)
+        end
+    end
+
+接下来就可以写测试了
+
+    require 'test_helper'
+
+    class UsersLoginTest < ActionDispatch::IntegrationTest
+
+      def setup
+        @user = user(:michael)
+      end
+
+      ...
+
+      test "login with remember" do
+        log_in_as(@user, remember_me: '1')
+        # 测试中cookies不能使用symbel key, 只能使用字符串
+        assert_not_nil cookies['remember_token']
+      end
+
+      test "login without remembering" do
+        log_in_as(@user, remember_me: '0')
+        assert_nil cookies['remember_token']
+      end
+    end
+
+前面已经确认了持久会话可以正常使用, 但是`current_user`方法的相关分支完全没有测试. 针对这种情况, 可以在未测试代码中抛出异常, 如果测试没有覆盖, 则能通过.
+
+    module SessionHelper
+      ...
+      # 返回cookie中记忆令牌对应的用户
+      def current_user
+        if (user_id = session[:user_id])
+          @current_user ||= User.find_by(id: user_id)
+        elsif
+          raise # 测试没有覆盖, 没有抛出异常, 可以通过
+          user = User.find_by(id: user_id)
+          if user && user.authenticated?(cookies[:remember_token])
+            log_in user
+            @current_user = user
+          end
+        end
+      end
+      ...
+    end
+
+加入对`current_user`方法的测试
+
+    require 'test_helper'
+
+    class SessionsHelperTest < ActionView::TestCase
+      def setup
+        @user = user(:michael)
+        remember(@user)
+      end
+
+      test 'current_user return right user when session is nil' do
+        assert_equal @user, current_user
+        assert is_logged_in?
+      end
+
+      test "current_user returns nil when remember digest is wrong" do
+        @user.update_attribute(:remember_digest, User.digest(User.new_token))
+        assert_nil current_user
+      end
+    end
+
+# 8.5 小结
+
+# 8.5.1 学到了什么
+
+* Rails可以使用临时cookie和持久cookie维护页面之间的状态
+* 登陆表单的目的是创建新会话, 登入用户
+* flash.now方法用于在重新渲染的页面中闪现消息
+* 在测试中重现问题可以使用TDD
+* 使用session方法可以安全的在浏览器中存储用户ID, 创建临时会话
+* 可以根据登陆状态修改功能, 例如布局中显示的链接
+* 集成测试可以检查路由, 数据库更新和对布局的修改
+* 为了实现持久会话, 我们为每个用户省城了记忆令牌和对应的记忆摘要
+* 使用cookies方法可以在浏览器的cookie中存储一个永久记忆令牌, 实现持久会话
+* 登陆状态取决于有没有当前用户, 而当前用户通过临时会话中的用户ID或持久会话中唯一的记忆令牌获取
+* 退出功能通过删除会话中的用户ID和浏览器中的持久cookie实现
+* 三元操作符是编写简单if-else语句的简介方式
+
+# 8.6 练习
+
+1. 对于下列代码中两种不同定义类方法的方式, 进行测试.
+
+    class User < ActiveRecord::Base
+
+     ...
+
+     # 返回i制定字符的哈希摘要
+     def self.digest(string)
+       cost = ActiveModel::SecurePassword.min_cost ? BCrypt::Engine:MIN_COST : BCrypt::Engine.cost
+       BCrypt::Password.create(string, cost: cost)
+     end
+
+
+      # 返回一个随机令牌
+      def self.token
+        Secure.urlsafe_base64
+      end
+
+      ...
+
+    end
+
+方法二:
+
+    class User < ActiveRecord
+
+     ...
+
+     class << self
+       # 返回指定字符串的hash摘要
+       def digest(string)
+         cost = ActiveRecord::SecurePassword.min_cost ? BCrypt::Engine::MIN_COST : BCrypt::Engine.cost
+         BCrypt::Password.create(string, cost: cost)
+       end
+
+       # 返回一个随机令牌
+       def new_token
+         SecureRandom.urlsafe_base64
+       end
+     end
+
+     ...
+    end
+
+
+2. 在之前说过, 集成测试中无法获取`remember_token`虚拟属性. 但是可以使用assigns方法获取. 该方法要求变量为实例变量.
+
+   class SessionsController < ApplicationController
+
+     def new
+     end
+
+     def create
+       @user = User.find_by(:email: params[:session][:email].downcase)
+       if @user && @user.authenticate(params[:session][:password])
+         login @user
+         params[:session][:remember_me] == '1' ? remember(@user) : forget(@user)
+         redirect_to @user
+       else
+         flash.now[:danger] = 'Invalid email/password combination'
+         render 'new'
+       end
+     end
+
+     def destroy
+       log_out if logged_in?
+       redirect_to root_url
+     end
+   end
+
+接下来可以重构测试
+
+    require 'test_helper'
+
+    class UsersLoginTest < ActionDispatch::IntegrationTest
+
+      def setup
+        @user = Users(:michael)
+      end
+
+      ...
+
+      test "login with remembering" do
+        log_in_as(@user, remember_me: '1')
+        assert_equal assign(:user).remember_digest, cookies[remember_token]
+      end
+
+      test "login without remembering" do
+        log_in_as(@user, remember_me: '0')
+        assert_nil cookies['remember_token']
+      end
+           ...
+
+    end
+
+# 9.1 更新用户
+## 9.1.1 编辑表单
+
+  首先来编写edit动作: 从数据库中读取相应的用户, 用户ID可以从params[:id]获取.
+
+  _代码清单9.1: 用户控制器的edit动作 app/controller/users\_controller.rb_
+
+    class UsersController < ApplicationController
+
+      def show
+        @user = User.find(params[:id])
+      end
+
+      def new
+        @user = Users.new
+      end
+
+      def create
+        @user = User.new(user_params)
+        if @user.save
+          log_in @user
+          flash[:success] = "Welcome to the Sample App"
+          redirect_to @user
+        else
+          render 'new'
+        end
+      end
+
+      # 创建edit方法, 用来编辑用户
+      def edit
+        @user = User.find(params[:id])
+      end
+
+      private
+        def user_params
+          params.require(:user).permit(:name, :email, :password, :password_confirmation)
+        end
+    end
+
+
+
+创建edit页面
+
+
+
+_代码清单9.2: 用户编辑页面视图 app/views/users/edit.html.erb_
+
+    <% proveide(:title, "Edit user") %>
+    <h1>Update your profile</h1>
+
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <%= form_for(@user) do |f| %>
+              <%= render 'shared/error_messages' %>
+
+              <%= f.label :name %>
+              <%= f.text_field :name, class: 'form-control' %>
+
+            <%= f.label :email %>
+            <%= f.text_field :email, class: 'form-control' %>
+
+            <%= f.label :password %>
+            <%= f.password_field :password, class: 'form-control' %>
+
+            <%= f.label :password_confirmation, "Confirmation" %>
+            <%= f.password_field :password_confirmation, class: 'form-control' %>
+            <%= f.submit "Save changes", class: "btn btn-primary" %>
+            <%end%>
+
+            <div class="gravatar_edit">
+                <%= gravatar_for @user %>
+                <a href="http://gravatar.com/emails" target="_blank">change</a>
+            </div>
+        </div>
+    </div>
+
+修改Gravatar头像的链接用到了target="\_blank". 目的是在新窗口或选项卡中打开这个网页, 链接到第三方网站时一般都会这么做.
+
+用户编辑页面与用户创建页面都用了form\_for表单, 那么Rails如何知道创建新用户要发送POST请求, 而编辑页面用户时要发送PATCH请求? 通过Active Record提供的new\_record?方法检测是新创建用户还是已经存在于数据库中.
+
+最后把导航中指向编辑用户页面的链接换成真实的地址.
+
+_代码清单9.4: 在网站布局中设置"Settings"链接的地址 app/views/layouts/\_headder.html.erb_
+
+    <header class="navbar navbar-firxed-top navbar-inverse">
+        <div class="container">
+            <%= link_to "sample app", root_path, id: "log" %>
+            <nav>
+                <ul class="nav navbar-nav pull-right">
+                    <li><%= link_to "Home", root_path %></li>
+                    <li><%= link_to "Help", help_path %></li>
+                    <%if loggend_in?%>
+                    <li class="dorpdown">
+                        <a href="#" class="dropdown-toggle" date-toggle="dropdown">Account <b class="caret"></b></a>
+                        <ul class="dorpdown-menu">
+                            <li><%= link_to "Profile", current_user %></li>
+                            <li><%= link_to "Seetings", edit_user_path(current_user) %></li>
+                            <li class="divider"></li>
+                            <li>
+                                <%= <link rel="stylesheet" href="url" type="text/css" media="screen" />_to "Log out", logout_path, method: "delete" %>
+                            </li>
+                        </ul>
+                    </li>
+                    <%else%>
+                    <li><%= link_to "Log in", login_path %>
+                    <%end%>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+## 9.1.2 编辑失败
+
+编辑失败和注册失败方法差不多. 先定义update动作, 把提交的params哈希传给update\_attributes方法, 如果提交的数据无效, 更新操作返回false, 由else分支处理, 重新渲染编辑页面.
+
+_代码清单9.5: update动作初始版本 app/controller/user\_controller.rb_
+
+    class UsersController < Applicationcontroller
+      def show
+        @user = User.find(params[:id])
+      end
+
+      def new
+        @user = User.new
+      end
+
+      def createp
+        @user = User.new(user_params)
+        if @user.save
+          log_in @user
+          flash[:success] = "Welcome to the Sample App!"
+          redirect_to @user
+        else
+          render 'new'
+        end
+      end
+      def edit
+        @user = User.find(params[:id])
+      end
+      def update
+        @user = User.find(params[:id])
+        if @user.update_attributes(user_params)
+          #处理更新成功情况
+        else
+          render 'edit'
+        end
+      end
+      private
+        def user_params
+          params.require(:user).permit(:name, :email, :password, :password_confirmation)
+        end
+    end
+
+## 9.1.3 编辑失败的测试
+
+表单已经可以使用, 现在要编写集成测试捕获回归. 先生成一个集成测试文件:`rails generate integration_test Users_edit`. 之后编写编辑失败的测试.
+
+_代码清单9.6: 编辑失败的测试 test/integration/users\_edit\_test_
+
+    require 'test_helper'
+    class UsersEditTest < ActionDispatch::IntegrationTest
+      def setup
+        @user = user(:michael)
+      end
+
+      test "unsucessful edit" do
+        get edit_user_path(@user)
+        patch User_path(@user), user: { name: '',
+                                        email: 'foo@invalid',
+                                        password: 'foo',
+                                        password_confirmation: 'bar'
+                                      }
+        assert_template 'users/edit'
+      end
+    end
+
+## 9.1.4 编辑成功(使用TDD)
+
+_代码清单9.8: 编辑成功的测试 test/integration/users\_edit\_test.rb_
+
+    require 'test_helper'
+    class UsersEditTest < ActionDispatch::IntegrationTest
+
+      def setup
+        @user = user(:michael)
+      end
+
+      ...
+      test "successful edit" do
+        # 进入@user编辑页面
+        get edit_user_path(@user)
+        name = "Foo Bar"
+        email = "foo@bar.com"
+        # 直接给发送patch给@user地址
+        patch user_path(@user), user: {
+                                       name: name,
+                                       email: email,
+                                       password: "",
+                                       password_confirmation: ""}
+        assert_not flash.empty?
+        assert_redirected_to @user
+        @user.reload
+        assert_equal @user.name, name
+        assert_equal @user.email, email
+      end
+    end
+
+要使代码清单9.8中的测试通过, 可以参照最终版的create动作.
+
+_代码清单9.9: 用户控制器的update动作 app/models/user.rb_
+
+    class UsersController < ApplicationController
+      ...
+      def update
+        @user = User.find(params[:id])
+        if @user.update_attributes(user_params)
+          flash[:success] = "Profile updated"
+          redirect_to @user
+        else
+          render 'edit'
+        end
+      end
+      ...
+    end
+
+测试无法通过, 因为密码长度验证失败, 为了让测试通过, 要在密码为空时特殊处理最短长度验证, 方法是把allow\_black: true传递给validates方法.
+
+_代码清单9.10: 更新时允许密码为空 app/models/user.rb_
+
+    class User < ActiveRecord::Base
+      before_save { self.email = email.downcase }
+      validates :name, presence: true, length: { maximum: 50 }
+      VALID_EMAIL_REGEX = /\A[\w+-.]+@[a-z\d\-.]+\.[a-z]+\z/i
+      validates :email, presence: true, length: { maximum: 255 }
+                        format: { with: VALID_EMAIL_REGEX },
+                        uniqueness: { case_sensitive: false }
+      has_secure_password
+      validates :password, length: { minimum: 6}, allow_blank: true
+      ...
+    end
+
+# 9.2 权限系统
+
+截止到目前为止, 任何人都能进行edit和update操作, 登陆后的用户可以更新其他用户的资料. 两种情况, 未登录用户(9.2.1节处理), 登陆用户(9.2.2节处理)
+
+## 9.2.1 必须先登陆
+
+对于未登录用户, 访问需要权限的功能时自动转向到登陆页面
+
+_代码清单9.12: 添加logged\_in\_user事前过滤器 app/controller/user\_controller_
+
+    class UsersController < ApplicationController
+      before_action :logged_in_user, only: [:edit, :update]
+      ...
+      private
+        def user_params
+          params.require(:user).permit(:name, :email, :password, password_confirmation)
+        end
+        # 事前过滤器
+        # 确保用户已经登陆
+        def logged_in_user
+          unless logged_in?
+            flash[:danger] = "Please log in."
+            redirect_to login_url
+          end
+        end
+    end
+
+因为已经要求先登入用户, 因此代码清单9.8中的测试需要更新.
+
+_代码清单9.14: 登入测试用户 test/integration/user\_edit\_test.rb_
+
+    require 'test_helper'
+    class UsersEditTest < ActionDispatch::IntegrationTest
+      def setup
+        @user = users(:michael)
+      end
+      test "unsuccessful edit" do
+        log_in_as(@user)
+        get edit_user_path(@user)
+        ...
+      end
+      test "successful edit" do
+        log_in_as(@user)
+        get edit_user_path(@user)
+        ...
+      end
+    end
+
+可以通过测试, 但是对事前过滤器的测试还没有完成, 即使把安全防护去掉, 测试也能通过.
+
+_代码清单9.16: 注释掉是恰恰你过滤其, 测试安全防护措施 app/controller/users\_controller.rb_
+
+    class UsersController < ApplicationController
+      # before_action :logged_in_user, only: [:edit, :update]
+      ...
+    end
+
+测试仍然能够通过. 改进UsersController的测试
+
+_代码清单9.17: 测试edit和update动作是受保护的 test/controllers/users\_controller\_test.rb_
+
+    require 'test_helper'
+
+    class UsersControllerTest < ActionController::TestCase
+      def setup
+        @user = users(:michael)
+      end
+
+      test "should get new" do
+        get :new
+        assert_response :success
+      end
+
+      test "should redirect edit when not logged in" do
+        get :edit, id: @user
+        assert_redirected_to login_url
+      end
+
+      test "should redirect update when not logged in" do
+        patch :update, id: @user, user: { name: @user.name, email: @user.email}
+        assert_redirected_to login_url
+      end
+    end
+
+
+注意get和patch的参数: `get :edit, id: @user`和`patch :update, id: @user, user: { name: @user.name, email: @user.email }`. 这里使用了一个rails的约定: 指定`id: @user`时, rails会自动使用`@user.id`, 在patch方法中还需要指定一个user哈希, 这样路由才能正常运行.
+
+去掉事前过滤器后, 测试可以通过.
+
+_代码清单9.18: 去掉事前过滤器的注释 略_
+
+_代码清单9.19: 运行测试 略_
+
+## 9.2.2 用户只能编辑自己的资料
+
+需要第二个用户, 在fixture中加入第二个用户.
+
+_代码清单9.20: 在固件文件中添加第二个用户 test/fixtures/users/yml_
+
+    michael:
+      name: Michael Example
+      email: michael@example.com
+      password_digest: <%= User.digest('password') %>
+
+    archer:
+      name: Sterling Archer
+      email: duchess@example.gov
+      password_digest: <%= User.digest('password) %>
+
+我们可以先编写测试
+
+_代码清单9.21: 尝试编辑其他用户资料的测试 test/controllers/users\_controller\_test.rb_
+
+    require 'test_helper'
+    class UsersControllerTest < ActionController::TestCase
+      def setup
+        @user = users(:michael)
+        @other_user = users(:archer)
+      end
+
+      test "should get new" do
+        get :new
+        assert_response :success
+      end
+
+      test "should redirect edit when not logged in" do
+        # 使用get方法, 获得:edit地址, 同时把@usere的id传递给get
+        get :edit, id: @user
+        assert_redirected_to login_url
+      end
+
+      test "should redirect update when not logged in" do
+        patch :update, id: @user, user: { name: @user.name, email: @user.email}
+        assert_redirected_to login_url
+      end
+
+      test "should redirect edit when logged in as wrong user" do
+        log_in_as @other_user
+        get :edit, id: @user
+        assert_redirected_to root_url
+      end
+
+      test "should redirect update when logged in as wrong user" do
+        log_in_as(@other_user)
+        patch :update, id: @user, user: { name: @user.name, email: @user.email}
+        assert_redirected_to root_url
+      end
+    end
+
+需要定义一个correct\_user方法, 在事前过滤器中调用这个方法, 同时可以把@user变量赋值加入correct\_user方法中, 所以可以把edit和update动作中的@user语句删掉.
+
+_代码清单9.22: 保护edit和update动作的correct_user事前过滤器 app/controllers/users\_controller.rb_
+
+    class UsersController < ApplicationController
+      before_action :logged_in_user, only: [:edit, :update]
+      before_action :correct_user, only: [:edit, :update]
+      ...
+      def edit
+      end
+      def update
+        if @user.update_attrbutes(user_params)
+          flash[:success] = "Profile updated"
+          redirect_to @user
+        else
+          render 'edit'
+        end
+      end
+      ...
+      private
+        def user_params
+          params.require(:user).permit(:name, :email, :password, :password_confirmation)
+        end
+        # 事前过滤器
+        # 确保用户已经登陆
+        def logged_in_user
+          unless logged_in?
+            flash[:danger] = "Please log in"
+            redirect_to login_url
+          end
+        end
+        # 确保是正确用户
+        def correct_user
+          @user = User.find(params[:id])
+          redirect_to(root_url) unless @user == current_user
+        end
+    end
+
+现在测试组件应该可以通过
+
+_代码清单9.23 运行测试 略_
+
+可以重构一下9.22中的确保是正确用户的重定向语句, 把`unless @user == current_user`改成语义稍微明确一点的`unless current_user?(@user)`. 这就要求在helper中定义这个方法.
+
+_代码清单9.24: current\_user?方法 app/helpers/sessions_helper.rb_
+
+    module SessionsHleper
+      # 登入制定用户
+      def log_in(user)
+        session[:user_id] = user.id
+      end
+      # 在持久会话中记住用户
+      def remember(user)
+        user.remember
+        cookies.permanent.signed[:user_id] = user.id
+        cookies.permanent[:remember_token] = user.remember_token
+      end
+      # 如果指定用户是当前用户, 返回true
+      def current_user?(user)
+        user == current_user
+      end
+    end
+
+这样可以得到最终满意的版本.
+
+_代码清单9.25: correct\_user最中版本_
+
+    class UsersController < ApplicationController
+      before_action :logged_in_user, only: [:edit, :update]
+      before_action :correct_user, only: [:edit, :update]
+      ...
+      def edit
+      end
+      def update
+        if @user.update_attributes(user_params)
+          falsh[:success] = "Profile updated"
+          redirect_to @user
+        else
+          render 'edit'
+        end
+      end
+      ...
+      private
+        def user_params
+          params.require(:user).permit(:name, :email, :password, :password_confirmation)
+        end
+        # 事前过滤器
+        # 确保用户已经登陆
+        def logged_in_user
+          unless logged_in?
+            flash[:danger] = "Please log in"
+            redirect_to login_url
+          end
+        end
+        # 确保是正确用户
+        def correct_user
+          @user = User.find(params[:id])
+          redirect_to(root_url) unless current_user?(@user)
+        end
+    end
+
+## 9.2.3 友好的转向
+
+假设用户想访问资料页面而又未登录, 登陆后会转到`user/1`页面, 而不是`user/1/edit`页面, 本节解决这个问题. 测试比较简单, 可以先写测试.
+
+_代码清单9.26: 测试友好的转向 test/integration/users\_edit\_test.rb_
+
+    require 'test_helper'
+    class UserEditTest < ActionDispatch::IntegrationTest
+      def setup
+        @user = users(:michael)
+      end
+      ...
+      test "successful edit with friendly forwarding" do
+        get edit_user_path(@user)
+        log_in_as(@user)
+        assert_redirected_to edit_user_path(@user)
+        name = "Foo Bar"
+        email = "foo@bar.com"
+        patch user_path(@user), user: { name: name,
+                                        email: email,
+                                        password: "foobar",
+                                        password_confirmation: "foobar" }
+        # 测试flash信息
+        assert_not flash.empty?
+        # 测试转向
+        assert_redirect_to @user
+        # 重新载入用户
+        @user.reload
+        assert_equal @user.name, name
+        assert_equal @user.email, email
+      end
+    end
+
+要实现友好转向, 首先需要在某个地方存储页面地址, 登陆后再转到地址.
+
+_代码清单9.27: 实现友好转向 app/helpers/sessions\_helper.rb_
+
+    module SessionHelper
+      ...
+      # 重定向到存储的地址, 或者默认的地址
+      def redirect_back_or(default)
+        redirect_to(session[:forwarding_url] || default)
+        # 为了确保安全, 转向后删除存储的地址
+        session.delete(:fowarding_url)
+      end
+      # 存储以后需要获取的地址
+      def store_location
+        # 只有get请求中才存储, 这么做, 当未登录用户提交表单时, 不会存储转向地址.
+        session[:forwarding_url] = request.url if request.get?
+      end
+    end
+
+现在可以把store\_location添加logged\_in\_user事前过滤器中.
+
+_代码清单9.28: 把store\_loaction添加到logged\_in\_user事前过滤器中 app/controllers/users\_controller.rb_
+
+    class UsersController < ApplicationController
+      before_action :logged_in_user, only: [:edit, :update]
+      before_action :correct_user, only: [:edit, :update]
+      ...
+      def edit
+      end
+      ...
+      private
+        def user_params
+          params.require(:user).permit(:name, :email, :password, :password_confirmation)
+        end
+        # 事前过滤器
+        # 确保用户已登陆
+        def logged_in_user
+          unless logged_in_user
+            # 存储用户登陆前的请求地址
+            store_location
+            flash[:danger] = "Please log in"
+            redirect_to login_url
+          end
+        end
+
+        # 确保是正确用户
+        def correct_user
+          @user = User.find(params[:id])
+          redirect_to(root_url) unless current_user?(@user)
+        end
+    end
+
+在create动作中调用redirect\_back\_or方法.
+
+_代码清单9.29: 加入友好转向后的create动作, app/controllers/sessions\_controller.rb_
+
+    class SessionsController < ApplicationController
+      ...
+      def create
+        user = User.find_by(email: params[:session][:email].downcase)
+        if user && user.authenticate(params[:session][:password])
+          log_in user
+          params[:session][:remember_me] == '1' ? remember(user) : forget(user)
+          redirect_back_or user
+        else
+          flash.now[:danger] = 'Invalid email/password combination'
+          render 'new'
+        end
+      end
+      ...
+    end
+
+之后可以通过测试组件
+
+_代码清单9.30: 测试 略_
+
+# 9.3 列出所有用户
+
+添加一个新的session\_crontoller动作, index, 用来显示所有用户.
+
+## 9.3.1 用户列表
+
+首先要实现一个安全机制, 目前单个用户资料开放给了所有访问者, 现在要限制用户列表页面, 只让已经登陆的用户查看, 减少未注册用户能查看到的信息量. 首先编写一个简单的测试, 确认应用会正确的重定向到index动作.
+
+_代码清单9.31: 测试index动作的重定向 test/controllers/users\_contrller\_test.rb_
+
+    require 'test_helper'
+    class UsersControllerTest < ActionController::TestCase
+      def setup
+        @user = users(:michael)
+        @other_user = users(:archer)
+      end
+      test "should redirect index when not logged in" do
+        get :index
+        assert_redirected_to login_url
+      end
+      ...
+    end
+
+接下来可以定义index动作, 并把它加入被logged\_in\_user事前过滤器的保护动作中
+
+_代码清单9.32: 访问index动作要先登陆 app/controllers/users\_controller.rb_
+
+    class UsersController < ApplicationController
+      before_action :logged_in_user, only: [:index, :edit, :update]
+      before_action :correct_user, only: [:edit, :update]
+      def index
+      end
+      def show
+        @user = User.find(params[:id])
+      end
+      ...
+    end
+
+创建index视图
+
+_代码清单9.34: index视图 app/views/users/index.html.erb_
+
+    <% provide(:title, 'All users') %>
+    <h1>All Users</h1>
+    <ul class="users">
+        <% @users.each do |user| %>
+            <li>
+                <%= gravatar_for user, size: 50 %>
+                <%= link_to user.name, user %>
+            </li>
+        <%end%>
+    </ul>
+
+添加一些css样式
+
+_代码清单9.35: 用户列表页面CSS app/assets/stylesheets/custom.css.scss_
+
+    ...
+    /* Users index */
+    .users {
+      list-style: none;
+      margin: 0;
+      li {
+         overflow: auto;
+         padding: 10px 0;
+         border-bottom: 1px solid $gray-lighter;
+      }
+    }
+
+最后还要把header导航中用户列表的连接地址换成users_path
+
+_代码清单9.36: 添加用户列表页面的链接地址 app/views/layouts/\_header.html.erb_
+
+    <header class="navbar navbar-fixed-top navbar-inverse">
+        <div class="container">
+            <%= link_to "sample app", root_path, id: "logo" %>
+                <nav>
+                    <ul class="nav navbar-nav pull-right">
+                        <li><%= link_to "Home", root_path %></li>
+                        <li><%= link_to "Help", help_path %></li>
+                        <%if logged_in? %>
+                            <li><%= link_to "Users", users_path %></li>
+                            <li class="dropdown">
+                                <a href="#", class="dropdown-toggle" data-toggle="dropdown">Account <b class="caret"></b></a>
+                                <ul class="dropdown-menu">
+                                    <li><%= link_to "Profile", current_user %></li>
+                                    <li><%= link_to "Seetings", edit_user_path(current) %></li>
+                                    <li class="divider"></li>
+                                    <li>
+                                        <%= link_to "Log out", logout_path, method: "delete" %>
+                                    </li>
+                                </ul>
+                            </li>
+                        <%else%>
+                            <li><%= link_to "Log in", login_path %></li>
+                        <%end%>
+                    </ul>
+                </nav>
+        </div>
+    </header>
+
+可以通过测试
+
+_代码清单9.37: 测试 略_
+
+## 9.3.2 示例用户
+
+添加一些示例用户, 可以使用faker gem.
+
+_代码清单9.38: 在Gemfile中加入faker_
+
+    source 'https://ruby.taobao.org'
+    gem 'rails', '4.2.0'
+    gem 'bcrypt', '3.1.7'
+    gem 'faker', '1.4.2'
+    ....
+
+_代码清单9.39: 向数据库中添加示例用户的Rake任务 db/seeds.rb_
+
+    User.create!(name: "Example User",
+                 email: "example@railstutorial.org",
+                 password: "foobar",
+                 password_confirmation: "foobar")
+
+    99.times do |n|
+      name = Faker:Name.name
+      email = "example-#{n+1}@railstutorial.org"
+      password = "password"
+      # create!方法与create一样, 只是遇到无效数据后会跑出异常, 而不是返回false, 这么做出现错误时不会静默, 有利于调试.
+      User.create!(name: name,
+                   email: email,
+                   password: password,
+                   password_confirmation: password)
+    end
+
+首先还原数据库`bundle exec rake db:migrate:reset`. 然后添加示例用户`bundle exec rake db:seed`.
+
+## 9.3.3 分页
+
+目前看来所有用户全在一个页面显示, 要实现分页可以使用一个叫做will\_paginate的工具. 为此要使用will\_paginate和bootstrap-will\_paginate这两个gem.
+
+_代码清单9.40: 在Gemfile中加入will\_paginate_
+
+    source 'https://ruby.taobao.org'
+    gem 'rails', '4.2.0'
+    gem 'bcrypt', '3.1.7'
+    gem 'faker', '1.4.2'
+    gem 'will_paginate', '3.0.7'
+    gem 'bootstrap-will_paginate', '0.0.10'
+    ...
+
+执行`bundle install`安装. 为了实现分页, 要在indexi视图中加入一些代码, 告诉rails分页显示用户, 并且要把index动作中的User.all换成知道如何分页的方法, 我们先在视图中加入特殊的will\_paginatea方法.
+
+_代码清单9.41: 在index视图中加入分页 app/views/users/index.html.erb_
+
+    <%provide(:title, 'All users')%>
+    <h1>All users</h1>
+    <%= will_paginate %>
+    <ul class="users">
+        <%@users.each do |user|%>
+            <li>
+                <%= gravatar_for user, size: 50 %>
+                <%= link_to user.name, user %>
+            </li>
+        <%end%>
+    </ul>
+    <%= will_paginate %>
+
+will\_paginate方法会在用户视图中自动寻找名为@users的对象, 然后显示一个分页导航链接. 现在视图还不能正确显示分页, 因为@users的值是通过User.all方法获取的, 而will\_paginate方法需要调用paginate方法才能分页. paginate方法可以接受一个hash参数, :page键的值指定显示第几页. User.paginate方法根据:page的值, 一次取回一组用户(默认为30), 如果:page的值为nil, paginate会显示第一页. 按照paginate的使用方法, 修改用户控制器.
+
+_代码清单9.42; 在index动作中分页取回用户 app/controllers/users\_controller.rb_
+
+    class UsersController < ApplicationController
+      before_action :logged_in_user, only: [:index, :edit, :update]
+      ...
+      def index
+        @users = User.paginate(page: params[:page])
+      end
+      ...
+    end
+
+# 9.3.4 用户列表页面的测试
+
+首先需要在fixture中创建更多用户用来测试分页情况.
+
+_代码清单9.43: 在fixtures中再创建30个用户 test/fixtures/users.yml_
+
+    michael:
+      name: Michael Example
+      email: micheal@example.com
+      pssword_digest: <%= User.digest('password') %>
+    archer:
+      name: Sterling Archer
+      email: duchess@example.gov
+      password_digest: <%= User.digest('password') %>
+    lana:
+      name: Lana Kane
+      email: hands|@example.gov
+      password_digest: <%= User.digest('password') %>
+    mallory:
+      name: Mallory Archer
+      email: boss@example.gov
+      password_digest: <%= User.digest('password') %>
+    <%30.times do |n|%>
+    user_<%= n %>:
+      name: <%= "User #{n}" %>
+      email: <%= "user-#{n}@example.com" %>
+      password_digest: <%= Users.digest('password') %>
+    <%end%>
+
+创建了用户以后, 可以编写测试了. 首先生成所需的测试文件`rails generate integration_test users_index`.
+
+_代码清单9.44: 用户列表及分页的测试 test/integration/users\_index\_test.rb_
+
+    require 'test_helper'
+    class UserIndexTest < ActionDispatch::IntegrationTest
+      def setup
+        @user = users(:michael)
+      end
+      test "index including pagination" do
+        log_in_as(@user)
+        get users_path
+        assert_template 'users/index'
+        assert_select 'div.pagination'
+        User.paginate(page: 1).each do |user|
+          assert_select 'a[href=?]', user_path(user), text: user.name
+        end
+      end
+    end
+
+最后进行测试.
+
+_代码清单9.45: 测试 略_
+
+## 9.3.5 使用布局视图重构
+
+用户列表已经可以实现分页了, rails提供了一些很巧妙的方法, 可以精简视图的结构. 重构的第一步把*代码清单9.41*中的li换成render方法调用.
+
+_代码清单9.46: 重构用户列表视图的第一步 app/views/users/index.html.erb_
+
+    <%provide(:title,'All users')%>
+    <h1>All users</h1>
+    <%= will_paginate %>
+    <ul class="users">
+        <%@users.each do |user|%>
+          <%= render user %>
+        <%end%>
+    </ul>
+    <%= will_paginate %>
+
+在上述代码中, render的参数不再是制定局部视图的字符串, 而是代表User类的变量user. 此时, rails会自动寻找一个名为\_user.html.erb的局部视图. 我们要手动闯将这个视图, 然后写入下面的内容.
+
+_代码清单9.47: 显示单个用户的局部视图 app/views/users/\_user.html.erb_
+
+    <li>
+        <%= gravatar_for user, size:50 %>
+        <%= link_to user.name, user%>
+    </li>
+
+这个改进不错, 但是可以做的更好, 直接把@users传给render, 如下所示.
+
+_代码清单9.48: 完全重构后的用户列表视图 app/views/users/index.html.erb_
+
+    <%provide(:title, 'All users')%>
+    <h1>All users</h1>
+    <%= will_paginate %>
+    <ul class="users">
+        <%= render @users %>
+    </ul>
+    <%= will_paginate %>
+
+rails会把@users当做一个User对象列表, 传递给render方法后, rails会自动遍历这个列表, 然后使用局部视图\_user.html.erb渲染每个对象. 最后进行测试确保测试组件仍能通过.
+
+_代码清单9.49: 测试 略_
+
+# 9.4 删除用户
+
+用户列表完成了, 符合REST架构的用户资源只剩最后一个--destroy动作. 首先添加删除用户链接, 然后编写destroy动作, 完成删除操作. 不过首先要创建管理员级别的用户, 并授权这些用户执行删除动作.
+
+## 9.4.1 管理员
+
+需要给UserModel添加一个名为admin的属性来标示用户是否有管理员权限, admin属性的类型为boolean. `rails generate migration add_admin_to_users admin:boolean`.
+
+_代码清单9.50: 向用户模型中添加admin属性的迁移 db/migrate/[timestamp]\_add\_admin\_to\_users.rb_
+
+    class AddAdminToUsers < ActiveRecord::Migration
+      def change
+        add_column :users, :admin, :boolean, default: false
+      end
+    end
+
+像往常一样执行迁移`bundle exec rake db:migrate`. rails能自动识别admin属性的类型为boolean, 自动生成admin?方法. 最后需要修改生成的示例用户代码, 把第一个用户设为管理员, 如下所示.
+
+_代码清单9.51: 在生成示例用户的代码中把第一个用户设为管理员 db/seeds.rb_
+
+    User.create!(name: "Example User",
+                 email: "example@railstutorial.org",
+                 password: "foobar",
+                 password_confirmation: "foobar",
+                 admin: true)
+    99.times do |n|
+      name = Faker::Name.name
+      email = "example-#{n+1}@railstutorial.org"
+      password = "password"
+      User.create!(name: name,
+                   email: email,
+                   password: password,
+                   password_confirmation: password)
+    end
+
+然后重置数据库`bundle exec rake db:migrate:rest`, 重新创建示例用户`bundle exec rake db:seed`
+
+健壮参数再探
+
+在上例中, 初始化hash参数指定了admin: true, 用户对象是暴露在网络中的, 如果请求中提供初始化参数, 恶意用户会发送`patch /users/17?admin=1`这样就把17号用户设置为管理员. 这是一个严重的潜在安全隐患. 因此, 必须只允许通过请求传入可安全编辑的属性, 如同7.3.2节说过的那样. 千万不要把admin加入user_params中!!
+
+## 9.4.2 destroy动作
+
+在用户列表的每个用户后面加入一个删除链接, 只有管理员才能看到这个链接, 也之有管理员能够执行删除操作. 首先来实现视图.
+
+_代码清单9.52: 删除用户的链接(只有管理员才能看到) app/views/users/\_user.html.erb_
+
+    <li>
+        <%= gravatar_for user, size: 50 %>
+        <%= link_to user.name, user %>
+        <%if current_user.admin? && !current_user?(user)%>
+          | <%= link_to "delete", user, mithod: :delete, data: { confirm: "You sure?"} %>
+        <%end%>
+    </li>
+
+浏览器无法发送DELETE请求, rails通过JavaScript模拟, 如果用户禁止了JavaScript, 那么删除用户的链接无法使用, 为了支持没有启用JavaScript的浏览器, 可以使用一个发送POST请求的表单来模拟DELETE请求(自己寻找资料).
+
+在用户控制器中加入destroy动作. 在destroy动作中, 先找到要删除的用户, 然后使用ActiveRecord提供的destroy方法将其删除. 此外, 要删除用户, 必须是登录以后, 所以在logged\_in\_user事前过滤器中加入了:destroy.
+
+_代码清单9.53: 添加destroy动作 app/controllers/users\_controller.rb_
+
+    class UsersController < ApplicationController
+      before_action :logged_in_user, only: [:index, :edit, :update, :destroy]
+      before_action :correct_user, only: [:edit, :update]
+      ...
+      def destroy
+        User.find(paramsp[:id]).destroy
+        flash[:success] = "User deleted"
+        redirect_to users_url
+      end
+      ...
+    end
+
+理论上只有管理员可以看到删除用户链接, 但是存在一个安全漏洞, 攻击者可以在命令行中发送, 删除网站中的任何用户, 为了解决这个问题, 限制destroy动作只有管理员可以访问.
+
+_代码清单9.54: 限制只有管理员才能访问destroy动作的事前过滤器 app/controllers/users\_controller.rb_
+
+    class UsersController < ApplicationController
+      before_action :logged_in_user, only: [:index, :edit, :update, :destroy]
+      before_action :correct_user, only: [:edit, :update]
+      before_action :admin_user, only: :destroy
+      ...
+      private
+      ...
+      # 确保是管理员
+      def admin_user
+        redirect_to(root_url) unless current_user.admin?
+      end
+    end
+
+## 9.4.3 删除用户的测试
+
+像删除用户这样危险的操作, 事前编写测试. 先要把fixtures中的一个用户设为管理员.
+
+_代码清单9.55: 把一个用户固件设为管理员 test/fixtures/users.yml_
+
+    michael:
+      name: Michael Example
+      email: michael@example.com
+      password_digest: <%= User.digest('password') %>
+      admin: true
+    archer:
+      name: Sterling Archer
+      email: duchess@example.gov
+      password_digest: <%= User.digest('password') %>
+    lana:
+      name: Lana Kane
+      email: hands@example.gov
+      password_digest: <%= User.digest('password') %>
+    mallory:
+      name: Mallory Archer
+      email: boss@wxample.gov
+      password_digest: <%= User.digest('password') %>
+    <% 30.times do |b| %>
+    user_<%= n %>
+      name: <%= "User #{n}" %>
+      email: <%= "user-#{n}@example.com "%>
+      password_digest: <%= User.digest('password') %>
+    <% end%>
+
+按照9.2.1节的做法, 我们会把限制访问动作的测试放在用户控制器测试文件中, 使用delete方法直接想destroy动作发送DELETE请求, 检查两种情况:
+
+1. 没登陆的用户会重定向到登陆页面
+2. 已经登陆的用户, 不是管理员, 会重定向到首页.
+
+_代码清单9.56: 测试只有管理员能访问的动作 test/controllers/users\_controller\_test.rb_
+
+    require 'test_helper'
+    class UsersControllerTest < ActionController::TestCase
+      def setup
+        @user = users(:michael)
+        @other_user = users(:archer)
+      end
+      ...
+      test "should redirect destroy when not logged in" do
+        assert_no_difference 'User.count' do
+          delete :destroy, id: @user
+        end
+        assert_redirected_to login_url
+      end
+      test "should redirect destroy when logged in as a non-admin" do
+        log_in_as(@other_user)
+        assert_no_difference 'User.count' do
+          delete :destroy, id: @user
+        end
+        assert_redirected_to root_url
+      end
+    end
+
+上面的测试完成了未授权用户的删除测试. 另外还要确认管理员点击删除连接后能够删除用户, 因此删除链接是在index页面, 因此将这个测试添加到index测试中.
+
+_代码清单9.57: 删除链接和删除用户操作的集成测试 test/integration/users\_index\_test.rb_
+
+    require 'test_helper'
+    class UsersIndexTest < ActionDispatch::IntegrationTest
+      def setup
+        @admin = users(:michael)
+        @non_admin = users(:archer)
+      end
+      test "index as admin including pagination and delete links" do
+        log_in_as(@admin)
+        get users_path
+        assert_template 'users/index'
+        assert_select 'div.pagination'
+        first_page_of_users = User.paginate(page: 1)
+        first_page_of_users.each do |user|
+          assert_select 'a[href=?]', user_path(user), text: user.nmae
+          unless user == @admin
+            assert_select 'a[href=?]', user_path(user), test: 'delete', method: :delete
+          end
+        end
+        assert_difference 'User.count', -1 do
+          delete user_apth(@non_admin)
+        end
+      end
+      test "index as non-admin" do
+        log_in_as(@non_admin)
+        get users_path
+        assert_select 'a', text: 'delete', count: 0
+      end
+    end
+
+最后进行测试
+
+_代码清单9.58: 测试 略_
+
+# 9.5 小结
+
+从数据库取出用户的时候由于生产环境和本地环境的不同, 可能影响其顺序. 对于用户列表来说问题不大, 如果对于微博而言, 就是很大的影响, 这个问题将在11.1.4节解决.
+
+## 9.5.1 读完本章学到了什么
+
+* 可以使用编辑表单修改用户的资料, 这个表单向update动作发送PATCH请求
+* 为了诶生通过web修改信息的安全性, 必须使用"健壮参数"
+* 事前过滤器是在控制器动作前执行方法的标准方式
+* 我们使用事前过滤器实现了权限系统
+* 针对权限系统的测试既使用了底层命令直接向控制器动作发送适当的HTTP请求, 也使用了高层的集成测试
+* 友好转向会在用户登陆后重定向到之前想访问的页面
+* 用户列表页面列出了所有用户, 而且一页只显示一部分用户
+* rails使用标准的文件db/seeds.rb向数据库中添加示例数据, 这个操作使用`rake db:seed`任务完成
+* `render @users`会自动调用\_user.heml.erb局部视图, 渲染集合中的各个用户
+* 在用户模型中添加admin布尔值属性后, 会自动创建user.admin?布尔值方法
+* 管理员点击删除链接可以删除用户, 点击删除连接后会向用户控制器的destroy动作发起DELETE请求
+* 在固件中可以使用嵌入式ruby创建大量测试用户
+
+# 9.6 练习
+
+
+# 10.1 账户激活
+
