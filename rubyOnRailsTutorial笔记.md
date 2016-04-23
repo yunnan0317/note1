@@ -3361,3 +3361,82 @@ _代码清单9.58: 测试 略_
 
 # 10.1 账户激活
 
+实现步骤:
+
+1. 用户开始处于"未激活"状态
+
+2. 用户注册后, 生成一个activation_token和对应的activation_digest
+
+3. 把activation_digest存储在数据库中(activation_token只是一个临时属性, 不存储在数据库中), 然后发送一个包含activation_token和user email的链接
+
+4. 用户点击这个连接后, 使用user email查找用户, 并且对比token和digest.
+
+5. 如果token和digest匹配, 就把状态由"未激活"改为"激活"
+
+|查找方式|字符串|摘要|认证|
+|------|---|----|----|
+|email|password|password_digest|authenticate(password)|
+|id|remember_token|remember_digest|authenticate?(:remember, token)|
+|email|activation_token|activation_digest|authenticate?(:activation, token)|
+|email|reset_token|reset_digest|authenticate?(:reset, token)|
+
+## 10.1.1 资源
+
+和session一样, 可以把"账户激活"看做一个资源, 不过这个资源不对应模型, 相关的数据(activation_digest和activation)存储在User Model中. 需要通过标准的REST URL处理账户激活邮件, 激活链接会改变用户的状态, 所以在edit动作中处理. 首先生成控制器
+
+    rails generate controller AccountActivations
+
+我们需要使用下面这个方法生成一个URL, 放在激活邮件中
+
+    edit_account_activation_url(activation_token, ...)
+
+为此我们要为edit动作设定一个具名路由, 高亮代码显示
+
+_代码清单10.1: 添加账户激活所需的资源路由 config/routest.rb_
+
+    Rails.application.routes.draw do
+      root 'static_pages#home'
+      get 'help' => 'static_pages#help'
+      get 'about' => 'static_pages#about'
+      get 'contact' => 'static_pages#contact'
+      get 'signup' => 'users#new'
+      get 'login' => 'sessions#new'
+      post 'login' => 'sessions#create'
+      delete 'logout' => 'sessions#destroy'
+      resources :users
+      resources :account_activation, only: [:edit]
+    end
+
+和remember\_me相同, 公开令牌, 在数据库中存储摘要. 这么做可以使用`user.activation_token`获得token, 使用`user.authenticated?(:activation, token)`进行用户认证. 同时还要定义一个返回boolean的方法, 用来检查用户激活状态`if user.activated?`
+
+|users||
+|--|--|
+|id|integer|
+|name|string|
+|email|string|
+|created\_at|datetime|
+|updated\_at|datetime|
+|password\_digest|string|
+|remember\_digest|string|
+|admin|boolean|
+|activation\_digest|string|
+|activated|boolean|
+|activated_at|datetime|
+
+添加需要的三个属性
+
+    rails generate migration add_activation_to_users activation_digest:string activated:boolean activated_at:datetime
+
+和admin一样, 需要把activated属性默认设置为false
+
+_代码清单10.2: 添加账户激活所需属性的迁移 db/migrate/[timestamp]\_add\_activation\_users.rb_
+
+    class AddActivationToUsers < ActivaRecord::Migration
+      def change
+        add_column :users, :activation_digest, :string
+        add_column :users, :activated, :boolean, default: false
+        add_column :users, :activated_at, :datetime
+      end
+    end
+
+执行迁移`bundle exec rake db:migration`
