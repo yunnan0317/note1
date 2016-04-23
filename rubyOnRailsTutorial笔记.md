@@ -3440,3 +3440,34 @@ _代码清单10.2: 添加账户激活所需属性的迁移 db/migrate/[timestamp
     end
 
 执行迁移`bundle exec rake db:migration`
+
+每个新注册的用户都需要激活, 应该在创建用户对象前分配激活令牌和摘要. 之前在存储email前会使用before\_save回调, 类似的, 可以使用before\_create回调, 按照下面的方式定义:
+
+    before_create :create_activation_digest
+
+与之前的before\_save调用不同, 上树代码采用方法引用. Rails会自动寻找一个名为create\_activation\_digest的方法, 在创建用户之前调用. 方法引用是推荐, 后面会重before\_save. 而create\_activation\_digest方法只会在用户模型中使用, 没有必要公开, 可以用private实现.
+
+_代码清单10.3: 在用户模型中添加账户激活相关的代码 app/models/user.rb_
+
+    class User < ActiveRecord::Migration
+      attr_accessor :remember_token, :activation_token
+      before_save :downcase_email
+      before_create :create_activation_digest
+      vlidates :name, presence: true, length: { maximum: 50 }
+      ...
+      private
+        # 将email地址转换成小写
+        def downcase_email
+          self.email = email.downcase
+        end
+
+        # 创建并赋值激活令牌和摘要
+        def create_activation_digest
+          self.activation_token = User.new_token
+          self.activation_digest = User.digest(activation_token)
+        end
+    end
+
+还需要修改seeds文件
+
+_代码清单10.4
