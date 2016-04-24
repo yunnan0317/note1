@@ -3470,4 +3470,64 @@ _代码清单10.3: 在用户模型中添加账户激活相关的代码 app/model
 
 还需要修改seeds文件
 
-_代码清单10.4
+_代码清单10.4 激活种子数据中的用户 db/seeds.rb_
+
+    User.create!(name: "Examole User",
+                 email: "example@railstutorial.org",
+                 password: "foobar",
+                 password_cofirmation: "foobar",
+                 admin: true,
+                 activated:boolean true,
+                 activated_at:datetime: Time.zone.now)
+    99.times do |n|
+        name = Faker::Name.name
+        email = "example-#{n+1}@railstutorial.org"
+        password = "password"
+        User.create!(name: name,
+                     emails: email,
+                     password: password,
+                     password_confirmation: password,
+                     activated:true,
+                     activated_at: Time.zone.now)
+    end
+
+ _代码清单10.5: 激活固件中的用户 test/fixtures/users.yml_
+
+    michael:
+      name: Michael Example
+      email: michaed@example.com
+      password_digest: <%= User.digest('password') %>
+      admin: true
+      activated: true
+      activated_at: <%= Time.zone.now %>
+
+    archer:
+      name: Sterling Archer
+      email: duchess@example.gov
+      password_digest: <%= User.digest('password') %>
+      activated: true
+      activated_at: <%= Time.zone.now %>
+
+    lana:
+      name: Lana Kane
+      email: hands@example.gov
+      password_digest: <%= User.digest('password') %>
+      activated: true
+      activated_at: <%= Time.zone.now %>
+
+    mallory:
+      name: Mallory Archer
+      email: boss@example.gov
+      password_digest: <%= User.digest('password') %>
+      activated: true
+      activated_at: <%= Time.zone.now %>
+
+    <% 30.times do |n| %>
+    user_<%= n %>
+      name: <%= "User #{n}" %>
+      email: <%= "user-#{n}@example.com" %>
+      password_digest: <%= User.digest('password') %>
+      activated: true
+      activated_at: <%= Time.zone.now %>
+    <% end %>
+      
