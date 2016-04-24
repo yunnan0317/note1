@@ -3530,4 +3530,153 @@ _代码清单10.4 激活种子数据中的用户 db/seeds.rb_
       activated: true
       activated_at: <%= Time.zone.now %>
     <% end %>
-      
+
+## 10.1.2 邮件程序
+
+创建邮件程序, 生成了account\_activation和password\_reset程序.
+
+    rails generate mailer UserMailer account_activation password_reset
+
+此外还生程了两个视图模板, 一个用于HTML邮件, 另一个用于纯文本文件.
+
+_代码清单10.6: 生成的账户激活邮件视图, 纯文本格式 app/views/user\_mailer/account\_activation.text.erb_
+
+    <h1>UserMailer#account_activation</h1>
+
+    <p>
+        <%= @greeting %>, find me in app/views/user_mailer/account_activation.html.erb
+    </p>
+
+生成的邮件程序
+
+_代码清单10.8: 生成的UserMailer app/mailers/user\_mailer.rb_
+
+    class UserMailer < ActionMailer::Base
+      default form: "from@example.com"
+
+      def account_activation
+        # 传递给邮件视图中的实例变量
+        @greeting = "Hi"
+
+        mail to: "to@example.org"
+      end
+
+      def password_reset
+        # 传递给邮件视图中的实例变量
+        @greeting = "Hi"
+
+        mail to: "to@example.org"
+      end
+    end
+
+为了发送激活邮件, 需要是用户对象的实例变量, 以便在视图中使用, 然后把邮件发送给user.email. mail法方法可以几首subject参数, 以便制定邮件的主题.
+
+_代码清单10.9: 发送账户激活链接 app/mailer/user\_mailer.rb_
+
+    class UserMailer <actionMailer::Base
+      default from: "noreply@example.com"
+
+      def account_activation(user)
+        # 需要在视图中使用的用户对象的实例变量
+        @user = user
+        mail to: user.email, subject: "Account Activation"
+      end
+
+      def password_reset
+        @greeting = "Hi"
+
+        mail to: "to@example.org"
+      end
+    end
+
+接下来要在视图中添加一个欢迎消息, 以及一个激活链接. 计划使用email地址来查找用户, 然后用激活令牌认证用户, 所以连接重应包含email地址和令牌, 因为把"账户激活"视为一个资源, 可以把令牌作为参数传给具名路由
+
+    edit_account_activation_url(@user.activation_token, ...)
+
+我们已经知道edit\_user\_url(user)生成地址为:
+
+    http://www.example.com/users/1/edit
+
+那么, 激活账户链接应该是
+
+    http://www.example.com/account_activations/[activation_token]/edit
+
+其中的activation\_token是使用new\_token方法生成的base64字符串, 可安全的在URL中使用. 这个值的作用和/user/1/edit中的用户ID一样, 在AccountActivationsController的edit动作中可以通过params[:id]来获取.
+
+为了包含电子邮件地址, 需要使用"查询参数"(query parameter), query parameter在URL中的问号后面, 使用键值对形式指定:
+
+    account_activations/[activation_token]/edit?email=foo%40example.com
+
+email中的@符号被转移了, 这样URL才是有效的. 在Rails中定义query parameter的方法是把一个hash传递给具名路由:
+
+    edit_account_action_url(@user.activation_token, email: @user.email)
+
+这种发放rails会自动转义特殊字符, 并且在controller中反转义, 通过params[:email]可以获取电子邮件地址.
+
+了解了这些之后就可以编辑邮件视图了.
+
+_代码清单10.10: 账户激活邮件的纯文本视图 app/views/user\_mailer/account\_activation.text.erb_
+
+    Hi <%= @user.name %>
+    Welcome to the Sample App! Click on the link below to activate your account:
+    <%= edit_account_activation_url(@user.activation_token, email: @user.email) %>
+
+_代码清单10.11: 账户激活的HTML视图 app/views/user\_mailer/account\_activation.html.erb_
+
+    <h1>Sample App</h1>
+    <p>Hi <%= @user.name %>,</p>
+    <p>Welcome to the Sample App! Click on the link below to activate your account:</p>
+    <%= link_to "Activate", edit_account_activation_url(@user.activation_token, email: @user.email) %>
+
+为了看到邮件效果, 可以使用邮件预览功能, rails提供了一些特殊的URL用来预览邮件. 首先要在应用的开发环境中添加设置.
+
+_代码清单10.12: 开发环境中的邮件设置 config/enviroments/development.rb_
+
+    Rails.application.configure do
+      ...
+      config.action_mailer.raise_delivery_errors = true
+      config.action_mailer.delivery_method = :test
+      host = 'example.com'
+      config.action_mailer.default_url_options = { host: host }
+      ...
+    end
+
+主机的地址'example.com'应是开发环境的主机地址, 例如下面的云端IDE和本地服务器:
+
+    host = 'rails-tutorial-c9-mhartl.c9.io' # 云端IDE
+    host = 'localhost:3000' # 本地主机
+
+重启rails服务器使配置生效. 接下来修改邮件程序的预览文件, 生成邮件时已经自动生成了这个文件.
+
+_代码清单10.13: 生成的邮件预览程序 test/mailer/previews/user\_mailer\_preview.rb_
+
+    # preview all email at http://localhost:3000/rails/mailers/user_mailer
+    class
+      # Preview this email at
+      # http://localhost:3000/rails/mailers/user_mailer/account_activation
+      # 最初生成的邮件预览程序, account_activation方法缺少参数传入.
+      def account_activation
+        UserMailer.account_activation
+      end
+
+      # Preview this email at
+      # http://localhost:3000/rails/mailers/user_mailer/password_reset
+      def password_reset
+        UserMailer.password_reset
+      end
+    end
+
+UserMailer中的account\_activation方法需要一个有效的用户作为参数, 把开发书库中的第一个用户赋值给它, 然后作为参数传递给UserMailer.account\_activation.
+
+_代码清单10.14: 预览账户激活邮件所需的方法 test/mailers/previews/user\_mailer\_preview.rb_
+
+    # Preview all emails at http://localhost:3000/rails/mailers/user_mailer
+    class UserMailerPreview < ActionMailer::Preview
+      def account_activation
+        user = User.first
+        # 新生成一个token只是用来预览, 因此预览页面内的地址并不是真正有效的.
+        user.activation_token = User.new_token
+        UserMailer.account_activation(user)
+      end
+        ...
+    end
