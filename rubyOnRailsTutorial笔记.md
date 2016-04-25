@@ -3680,3 +3680,83 @@ _代码清单10.14: 预览账户激活邮件所需的方法 test/mailers/preview
       end
         ...
     end
+
+最后编写测试, 确认邮件内容
+
+_代码清单10.15: Rails生成的UserMailer测试 test/mailers/user\_mailer\_test.rb_
+
+    require 'test_helper'
+    class UserMailerTest < ActionMailer::TestCase
+      test "account_activation" do
+        mail = UserMailer.account_activation
+        assert_equal "Account activation", mail.subject
+        assert_equal ["to@examole.org"], mail.to
+        assert_equal ["from@example.com"], mail.from
+        assert_match "Hi", mail.body.encoded
+      end
+      test "password_reset" do
+        mail = UserMailer.password.reset
+        assert_equal "Password reset", mail.subject
+        assert_equal ["to@example.org"], mail.to
+        assert_equal ["from@example.com"], mail.form
+        assert_match "Hi", mail.body.encoded
+      end
+    end
+
+代码清单10.15中使用了强大的assert_match方法, 这个方法既可以匹配字符串, 也可以匹配正则表达式.
+
+    assert_match 'foo', 'foobar' # true
+    assert_match 'baz', 'foobar' # false
+    assert_match /\w+/, 'foobar' # true
+    assert_match /\w+/, '$#@!^&' # false
+
+_代码清单10.16: 测试现在这个邮件程序 test/mailers/user\_mailer\_test.rb_
+
+    require 'test_helper'
+    class UserMailerTest < ActionMailer::TestCase
+      test "account_activation" do
+        user = users(:michael)
+        user.activation_token = User.new_token
+        mail = UserMailer.account_activation(user)
+        assert_equal "Account activation", mail.subject
+        assert_equal [user.email], mail.to
+        assert_equal ["noreply@example.com"], mail.from
+        assert_match user.name, mail.body.encoded
+        assert_match user.activation_token, mail.body.encoded
+        # CGI:escape()方法用来转义
+        assert_match CGI::escape(user.email), mail.body.encoded
+    end
+
+在这个测试中为fixture指定了activation_token, 而fixture中没有虚拟属性. 为了让测试通过, 需要修改测试环境配置.
+
+_代码清单10.17: 设定测试环境的主机地址 config/enviroments/test.rb_
+
+    Rails.application.configure do
+      ...
+      config.action_mailer.delivery_method = :test
+      config.action_mailer.default_url_options = { host: 'example.com' }
+      ...
+    end
+
+现在可以通过了
+
+_代码清单10.18: 测试 略_
+
+记下来可以把邮件程序添加到应用中, 只需要在Model::User#create中添加几行.
+
+_代码清单10.19: 在注册过程中添加账户激活 app/controllers/users\_controller.rb_
+
+    class UsersController < ApplicationController
+      ...
+      def create
+        @user = User.new(user_params)
+        if @user.save
+          UserMailer.account_activation(@user).deliver_now
+          flash[:info] = "Please check your email to activate your account"
+          redirect_to root_url
+        else
+          render 'new'
+        end
+      end
+      ...
+    end
