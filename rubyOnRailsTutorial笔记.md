@@ -3760,3 +3760,97 @@ _代码清单10.19: 在注册过程中添加账户激活 app/controllers/users\_
       end
       ...
     end
+
+现在注册后重新定向到root_url而不是users/show, 并且不会自动登陆, 所以测试不会通过.
+
+_代码清单10.20: 临时注释掉失败的测试 test/integration/users\_signup\_test.rb_
+
+   require 'test_helper'
+   class UsersSignupTest < ActionDispatch::IntegrationTest
+     test "invalida signup information" do
+       get signup_path
+       assert_no_difference 'User.count' do
+         post users_path, user: { name: "",
+                                  email: "user@invalid",
+                                  password: "foo",
+                                  password_confirmation: "bar"}
+       end
+       assert_template 'users/new'
+       assert_select 'div#error_explanation'
+       assert_select 'div.field_with_errors'
+     end
+     test "vlida signup information" do
+       get signup_path
+       assert_difference 'User.count' 1 do
+         post_via_redirect users_path, user: { name: "Example User",
+                                               email: "user@example.com",
+                                               password: "password",
+                                               password_confirmation: "password"}
+       end
+       # 暂时先注释掉测试代码
+       # assert_template 'users/show'
+       # assert is_logged_in?
+     end
+   end
+
+现在注册后会转向root_url, 并且会生成一封邮件, 在开发环境中并不会真发送邮件, 不过能在服务器日志中看到.
+
+_代码清单10.21: 在服务器日志中看到的账户激活邮件_
+
+    Sent mail to michael@michaelhartl.com (931.6ms)
+    Date: Wed, 03 Sep 2014 19:47:18 +0000
+    ....
+
+## 103.1.3 激活账户
+
+完成了邮件后, 要编写AccountActivationsController中的edit动作, 激活账户. 上节说过, activation_token和email可以从params[:id]和params[:email]获取. 参照密码和记忆令牌实现方式, 计划这样查找和认证用户:
+
+    user = User.find_by(email: params[:email])
+    # 缺少一个判断条件
+    if user  user.authenticated?(:activation, params[:id])
+
+代码中的authenticated?()方法和现在的还有差别, 现在的authenticated?方法是专门用来认证remember_token的.
+
+    # 如果指定的令牌和摘要匹配, 返回true
+    def authenticated?(remember_token)
+      return false if remember_digest.nil?
+      BCrypt::Password.new(remember_digest).is_password?(remember_token)
+    end
+
+重构这个方法, 使用途更广
+
+_代码清单10.22: 用途更广的authenticated?方法 app/models/user.rb_
+
+   class User < ActiveRecord::Base
+     ...
+     # 如果指定的令牌和摘要匹配, 返回true
+     def autheticated?(attribute, token)
+       digest = send("#{attribute}_digest")
+       return false if digest.nil?
+       BCrypt::Password.new(digest).is_password?(token)
+     end
+     ...
+   end
+
+_代码清单10.23: 测试 略_
+
+测试失败, 原因是remember_me还是使用以前的authenticated?发放.
+
+_代码清单10.24: 在current\_user中使用修改后的authenticated?发放 app/helpers/session\_helper.rb_
+
+    module SessionsHelper
+      ...
+      # 返回当前已登陆的用户(如果有的话)
+      def current_user
+        if (user_id = session[:user_id])
+          @current_user ||= User.find_by(id: user_id)
+        elsif (user_id = cookies.signed[:user_id])
+          user = User.find_by(id: user_id)
+          if user && user.authenticated?(:remember, cookies[:remember_token])
+            log_in user
+            @current_user = user
+          end
+        end
+      end
+      ...
+    end
