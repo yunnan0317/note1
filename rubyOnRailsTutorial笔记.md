@@ -1635,7 +1635,7 @@ session创建的临时cookie会自动加密, 所以上面的代码是安全的, 
         # 测试是否有登出按钮
         assert_select "a[href=?]", logout_path, count: 0
         # 测试是否有用户设置按钮
-        assert_select "a[href=?]", user_path(@usere), count: 0
+        assert_select "a[href=?]", user_path(@user), count: 0
       end
     end
 
@@ -3475,7 +3475,7 @@ _代码清单10.4 激活种子数据中的用户 db/seeds.rb_
     User.create!(name: "Examole User",
                  email: "example@railstutorial.org",
                  password: "foobar",
-                 password_cofirmation: "foobar",
+                 password_confirmation: "foobar",
                  admin: true,
                  activated:boolean true,
                  activated_at:datetime: Time.zone.now)
@@ -3854,3 +3854,76 @@ _代码清单10.24: 在current\_user中使用修改后的authenticated?发放 ap
       end
       ...
     end
+
+_代码清单10.25: 在UserTest中使用修改后的authenticated?方法 test/models/user\_test.rb_
+
+    require 'test_helper'
+    class UersTest < ActiveSupport::TestCase
+      def setup
+        @user = User.new(name: "Example User", email: "user@example.com",
+                         password: "foobar", password_confirmation: "foobar")
+      end
+      ...
+      test "authenticate? should return false for a user with nil digest" do
+        assert_not @user.authenticated?(:remember, '')
+      end
+    end
+
+修改后测试可以通过
+
+_代码清单10.26: 测试 略_
+
+有了重构后的authenticated?方法, 现在可以编写edit动作了.
+
+_代码清单10.27: 在edit动作中激活账户 app/controllers/account\_activation\_controller.rb_
+
+    class AccountActivationsController < ApplicationController
+      def edit
+        user = User.find_by(email: params[:email])
+        if user && !user.acitvated? && user.authencated?(:activation, params[:id])
+          user.update_attribute(:activated, true)
+          user.update_attribute(:activated_at, Time.zone.now)
+          log_in user
+          flash[:success] = "Account activated!"
+          redirect_to user
+        else
+          flash[:danger] = "Invalid activation link"
+          redirect_to root
+        end
+      end
+    end
+
+然后将服务器日志里的url复制到浏览器中, 就可以激活对应账户了. 注意邮件预览中的url并不是真正的激活url.
+
+现在激活账户还没有实际效果, 因为还没有修改登陆方式.
+
+_代码清单10.28: 禁止未激活的用户登陆 app/controllers/session\_controller.rb_
+
+    class SessionsController < ApplicationController
+      def new
+      end
+      def create
+        user = User.find_by(email: params[:session][:email].downcase)
+        if user && user.authenticate(params[:session][:password])
+          if user.activated?
+            log_in user
+            params[:session][:remember_me] == '1' ? remember(user) : forget(user)
+            redirect_back_or user
+          else
+            message = "Account not activated"
+            message += "Check your email for the activation link."
+            flash[:warning] = message
+            redirect_to root_url
+          end
+        else
+          flash.now[:danger] = 'Invalid email/password combination'
+          render 'new'
+        end
+      end
+      def destroy
+        log_out if logged_in?
+        redirect_to root_url
+      end
+    end
+
+## 10.1.4 测试和重构
