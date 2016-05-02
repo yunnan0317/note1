@@ -3927,3 +3927,656 @@ _代码清单10.28: 禁止未激活的用户登陆 app/controllers/session\_cont
     end
 
 ## 10.1.4 测试和重构
+
+本节为账户激活功能添加一些测试, 并将这些测试加入注册测试中.
+
+_代码清单10.29: 在用户注册的测试文件中添加账户激活的测试 test/integration/users\_signup\_test.rb_
+
+    require 'test_helper'
+    class UsersSignupTest < ActionDispatch::IntegrationTest
+      def setup
+        # ActionMailer::Base.deliveries用来存放已发送邮件数目
+        # 提前清空发送数目, 以便后面测试
+        ActionMailer::Base.deliveries.clear
+      end
+
+      test "invalid signup information" do
+        get signup_path
+        assert_no_difference 'User.count' do
+          post users_path, user: { name: "",
+                                   email: "user@invalid",
+                                   password: "foo",
+                                   password_confirmation: "bar" }
+        end
+        assert_template 'users/new'
+        assert_select 'div#error_explanation'
+        assert_select 'div.field_with_errors'
+      end
+      test "valid signup information with account activation" do
+        get signup_path
+        assert_difference 'User.count', 1 do
+          post users_path, user: { name: "Example User",
+                                   email: "user@example.com",
+                                   password: "password",
+                                   password_confirmation: "password" }
+        end
+        assert_equal 1, ActionMailer::Base.deliveries.size
+        # assigns用来获取相应动作中的实例变量.
+        user = assigns(:user)
+        assert_not user.activated?
+        # 尝试在激活前登陆
+        log_in_as(user)
+        assert_not is_logged_in?
+        # 激活令牌无效
+        get edit_account_activation_path("invalid token")
+        assert_not is_logged_in?
+        # 令牌有效, 电子邮件无效
+        get edit_account_activation_path(user.activation_token, email: 'wrong')
+        assert_not is_logged_in?
+        # 激活令牌有效
+        get edit_account_activation_path(user.activation_token, email: user.email)
+        assert user.reload.activation?
+        follow_redirect!
+        assert_template 'users/shwo'
+        assert is_logged_in?
+      end
+    end
+
+_代码清单10.30: 测试 略_
+
+有了测试后, 就可以做一下重构: 把处理用户的代码从控制器中移出, 放入模型, 我们会定义一个activate方法, 用来更新用户激活的属性; 还要定义一个send\_activation\_email方法, 发送激活邮件.
+
+_代码清单10.31: 在用户模型中添加账户激活相关的方法 app/model/user.rb_
+
+    class User < ActiveRecord::Base
+      ...
+      # 激活账户
+      def activate
+        update_attribute(:activated, true)
+        update_attribute(:actvated_at, Time.zone.now)
+      end
+
+      # 发送激活邮件
+      def send_activation_email
+        UserMailer.account_activation(self).deliver_now
+      end
+
+      private
+      ...
+    end
+
+_代码清单10.32: 通过用户模型对象发送邮件 app/controller/users\_controller.rb_
+
+    class UsersController < ApplicationController
+      def create
+        @user = User.new(user_params)
+        if @user.save
+          @user.send_activation_email
+          flash[:info] = "Please check your email to activate your account."
+          redirect_to root_url
+        else
+          render 'new'
+        end
+      end
+      ...
+    end
+
+_代码清单10.33: 通过用户模型对象激活账户 app/controllers/account\_activations\_controller.rb_
+
+    class AccountActivationsController < ApplicationController
+      def edit
+        user = User.find_by(email: params[:email])
+        if user && !user.activated? && user.authenticated?(:activation, params[:id])
+          user.activate
+          log_in user
+          flash[:success] = "Account activated!"
+          redirect_to user
+        else
+          flash[:danger] = "Invalid activation link"
+          redirect_to root_url
+        end
+      end
+    end
+
+# 10.2 密码重设
+
+密码重置过程:
+1. 在登陆表单中添加"forgot password"链接.
+
+2. "forgot password"转向一个表单, 要求提交email, 之后向这个地址发送一封包含密码重置链接的邮件.
+
+3. 密码重置链接会转向一个表单, 这个表单含有重置密码以及密码确认.
+
+主要步骤:
+
+1. 用户请求重设密码时, 使用提交的电子邮件地址查找用户;
+
+2. 如果数据库中有这个电子邮件地址, 生成一个重设令牌和对应的摘要;
+
+3. 把重设摘要保存在数据库中, 然后给用户发送一封邮件, 其中一个包含重设令牌和用户电子邮件地址的链接;
+
+4. 用户点击这个链接后, 使用电子邮件地址查找用户, 然后对比令牌和摘要;
+
+5. 如果匹配, 显示重设密码的表单
+
+## 10.2.1 资源
+
+和账户激活一样, 重设密码也看做一个资源, 首先要为资源生成控制器:
+
+    rails generate controller PasswordResets new edit --no-test-framework
+
+注意, 我们不需要控制器测试(使用集成测试), 所以没有生成测试框架.
+
+我们需要两个表单, 一个请求重设表单, 一个修改用户模型中的密码, 所以要为new, create, edit和update四个动作制定路由.
+
+_代码清单10.35: 添加"密码重设"资源的路由 config/routes.rb_
+
+    Rails.application.routes.draw do
+      root 'static_pages#home'
+      get 'help' => 'static_pages#help'
+      get 'about' => 'static_pages#about'
+      get 'contact' => 'static_pages#contact'
+      get 'signup' => 'user#new'
+      get 'login' => 'sessions#new'
+      post 'login' => 'sessions#create'
+      delete 'logout' => 'sessions#destroy'
+      resources :users
+      resources :account_activations, only: [:edit]
+      resources :password_resets, only: [:new, :create, :edit, :update]
+    end
+
+
+HTTP请求|URL|动作|具名路由
+--|--|--|--
+GET|/password\_reset/new|new|new\_password\_reset\_path
+POST|/password\_resets|create|password\_reset\_path
+GET|/password\_resets/\<token\>/edit|edit|edit\_password\_reset\_path(token)
+PATCH|/password_resets/\<token\>|update|password\_reset\_path(token)
+
+_代码清单10.36: 添加打开忘记密码表单的链接 app/views/sessions/new.html.erb_
+
+    <% provide(:title, "Log in") %>
+    <h1>Log in</h1>
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <%= form_for(:session, url: login_path) do |f| %>
+
+              <%= f.label :email %>
+              <%= f.text_field :email, class: 'form-control' %>
+
+              <%= f.label :password %>
+              <%= link_to "(forgot password)", new_password_reset_path %>
+              <%= f.password_field :passsword, class: 'form-control' %>
+
+              <%= f.label :remember_me, class: "checkbox inline" do %>
+                <%= f.check_box :remember_me %>
+                <span>Remember me on this computer</span>
+              <% end %>
+
+              <%= f.submit "Log in", class: "btn btn-primary" %>
+            <% end %>
+            <p>New user? <%= link_to "Sign up now!", signup_path %></p>
+        </div>
+    </div>
+
+密码所需的数据模型和账户激活的类似, 需要一个虚拟的重设令牌属性, 在密码重设邮件中使用, 一个重设摘要属性, 用来取回用户. 同时计划让重设链接几小时后失效, 因此需要记录邮件发送时间.
+
+|user||
+|--|--|
+id|integer
+name|string
+email|string
+created\_at|datetime
+updated\_at|datetime
+password\_digest|string
+remember\_digest|string
+admin|boolean
+activation\_digest|string
+activated|boolean
+activated\_at|datetime
+reset\_digest|string
+reset\_sent\_at|datetime
+
+添加这两个属性的迁移
+
+    rails generate migration add_reset_to_users reset_digest:string reset_sent_at:datetiem
+    bundle exec rake db:migrate
+
+## 10.2.2 控制器和表单
+
+password\_reset和session一样, 都是没有模型的资源, 因此表单可以参考登陆表单.
+
+_代码清单10.37: 登陆表单的代码 app/views/sessions/new.html.erb 略_
+
+_代码清单10.38: 请求重设密码页面的视图 app/views/password\_reset/new.html.erb_
+
+    <% provide(:title, "Forgot password") %>
+    <h1>Forgot password</h1>
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <%= form_for(:password_set, url: password_resets_path) do |f| %>
+              <%= f.label :email %>
+              <%= f.text_field :email, class: 'form-control' %>
+
+              <%= f.submit "Submit", class: "btn btn-primary" %>
+            <% end %>
+        </div>
+    </div>
+
+提交后通过电子邮件查找用户, 更新这个用户的reset\_token, reset\_digest和reset\_sent\_at属性, 然后重定向到根地址,
+并显示一个闪现消息. 如果提交的消息无效, 重新渲染这个页面, 并且显示一个flash.now消息. 根据要求可以写出create代码.
+
+_代码清单10.39: PasswordResetController的create动作 app/controllers/password\_resets\_controller.rb_
+
+    class PasswordResetsController
+      def new
+      end
+      def create
+        @user = User.find_by(email: params[:password_reset][:email].downcase)
+        if @user
+          @user.create_reset_digest
+          @user.send_password_reset_email
+          flash[:info] = "Email sent with password reset instructions"
+          redirect_to root_url
+        else
+          flash.now[:danger] = "Email address not found"
+          render 'new'
+        end
+      end
+
+      def edit
+      end
+    end
+
+上述代码调用了create\_reset\_digest方法, 需要在用户模型中定义.
+
+_代码清单10.40: 在用户模型中添加重设密码所需的方法 app/models/user.rb_
+
+    class User < ActiveRecord::Base
+      attr_accessor :remember_token, :activation_token, :reset_token
+      before_save :downcase_email
+      before_create :create_activation_digest
+      ...
+      # 激活账户
+      def activate
+        update_attribute(:activated, true)
+        update_attribute(:activated_at, Time.zone.now)
+      end
+
+      # 发送激活邮件
+      def send_activation_email
+        UserMailer.account_activation(self).deliver_now
+      end
+
+      # 设置密码重设相关的属性
+      def create_reset_digest
+        self.reset_token = User.new_token
+        update_attribute(:reset_digest, User.digest(reset_token))
+        update_attribute(:reset_sent_at, Time.zone.now)
+      end
+
+      # 发送密码重设邮件
+      def send_password_reset_email
+        UserMailer.password_reset(self).deliver_now
+      end
+
+      private
+
+        # 把电子邮件地址转成小写
+        def downcase_email
+          self.email = email.downcase
+        end
+
+        # 创建并赋值激活令牌和摘要
+        def create_activation_digest
+          self.activation_token = User.new_token
+          self.activation_digest = User.digest(activation_token)
+        end
+    end
+
+## 10.2.3 邮件程序
+
+上段代码中发送密码重设邮件的代码为
+
+    UserMailer.password_reset(self).deliver_now
+
+这个方法和用户激活的邮件程序基本一样. 我们首先在UserMailer中定义password_reset方法, 然后编写邮件视图.
+
+_代码清单10.41: 发送密码重设链接 app/mailers/user\_mailer.rb_
+
+    class UserMailer < ActionMailer::Base
+      default from: "noreply@example.com"
+
+      def account_activation(user)
+        @user = user
+        mail to: user.email, subject: "Account activation"
+      end
+
+      def password_reset(user)
+        @user = user
+        mail to: user.email, subject: "Password reset"
+      end
+    end
+
+_代码清单10.42: 密码重设邮件的纯文本视图 app/views/user\_mailer/password\_reset.text.erb_
+
+    To reset your password click the link below:
+
+    <%= edit_password_reset_url(@user.reset_token, email: @user.email) %>
+
+    This link will expire in two hours.
+
+    If you did not request your password to be reset, please ignore this email and your password will stay as it is.
+
+_代码清单10.43: 密码重设邮件的HTML视图 app/views/user\_mailer/password\_reset.html.erb_
+
+    <h1>Password reset</h1>
+
+    <p>To reset your password click the link below:</p>
+
+    <%= link_to "Reset password", edit_password_reset_url(@user.reset_token, email: @user.email) %>
+
+    <p>This link will expire in two hours.</p>
+
+    <p>
+        If you did not request your password to be reset, please ignore this email and your password will stay as it is.
+    </p>
+
+和账户激活一样, 也可一预览邮件.
+
+_代码清单10.44: 预览密码重设邮件所需的方法 test/mailers/previews/user\_mailer\_preview.rb_
+
+    # Preview all emails at http://localhost:3000/rails/mailers/user_mailer/
+    class UserMailerPreview < ActionMailer::Preview
+
+      # Preview this email at
+      # http://localhost:3000/rails/mailers/user_mailer/account_activation
+
+      def account_activation
+        user = User.first
+        user.activation_token = User.new_token
+        UserMailer.account_activation(user)
+      end
+
+      # Preview this email at
+      # http://localhost:3000/rails/mailers/user_mailer/password_reset
+      def password_reset
+        user = User.first
+        user.reset_token = User.new_token
+        UserMailer.password_reset(user)
+      end
+    end
+
+然后就可以预览密码重设邮件了. 同样的, 参照激活邮件程序的测试, 编写密码重设邮件程序的测试. 注意我们要创建密码重设令牌, 以便在视图中使用.
+这一点和激活令牌不一样, 激活令牌使用before\_create回调创建, 但是密码重设令牌只会在用户成功提交"Forget Password"表单后创建, 在集成测试
+中很容易创建密码重设令牌(代码清单10.52), 但在邮件程序的测试中必须手动创建.
+
+_代码清单10.45: 添加密码重设邮件程序的测试 test/mailers/user\_mailer\_test.rb_
+
+    require 'test_helper'
+
+    class UserMailerTest < ActionMailer::TestCase
+
+      test "account_activation" do
+        user = user(:michael)
+        user.activation_token = User.new_token
+        mail = UserMailer.account_activation(user)
+        assert_equal "Account activation", mail.subject
+        assert_equal [user.email], mail.to
+        assert_equal ["noreply@example.com"], mail.from
+        assert_match user.name, mail.body.encoded
+        assert_match user.activation_token, mail.body.encoded
+        assert_match CGI::escape(user.email), mail.body.encoded
+      end
+
+      test "password_reset" do
+        user = users(:michael)
+        user.reset_token = User.new_token
+        mail = UserMailer.password_reset(user)
+        assert_equal "Password reset", mail.subject
+        # 放在数组中
+        assert_equal [user.email], mail.to
+        # 放在数组中
+        assert_equal ["noreply@example.com"], mail.from
+        assert_match user.name, mail.body.encoded
+        assert_match user.reset_token, mail.body.encoded
+        assert_match CGI::escape(user.email), mail.body.encoded
+      end
+    end
+
+_代码清单10.46: 测试 略_
+
+## 10.2.4 重设密码
+
+为了让下面这样形式的链接生效, 编写一个表单, 重设密码.
+
+    http://exmaple.com/password_resets/[reset_token]/edit?email=foo%40bar.com
+
+这个表单和编辑用户资料表单有一些类似, 只不过需要更新密码和密码确认字段, 处理起来更为复杂, 因为我们希望通过
+电子邮件查找用户, 也就是说, 在edit和update动作中都需要使用邮件地址. 在edit动作中可以轻易获取邮件地址, 因为
+链接中有. 可是提交表单后, 邮件地址就没有了, 为了解决这个问题, 我们可以使用一个"hidden\_field\_tag"
+
+_代码清单10.48: 重设密码的表单 app/views/password\_resets/edit.html.erb_
+
+    <% provide(:title, 'Reset password') %>
+
+    <h1>Reset password</h1>
+
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <%= form_for(@user, url: password_reset_path(params[:id])) do |f| %>
+              <%= render 'shared/error_message' %>
+
+              <%= hidden_field_tag :email, @user.email %>
+
+              <%= f.label :password %>
+              <%= f.password_field :password, class: 'form-control' %>
+
+              <%= f.label :password_confirmation %>
+              <%= f.password_field :password_confirmation, class: 'form-control' %>
+
+              <%= f.submit "Update password", class: "btn btn-primary" %>
+            <% end %>
+        </div>
+    </div>
+
+注意, 使用的是
+
+    hidden_field_tag :email, @user.email
+
+而不是
+
+    f.hidden_field :email, @user.email
+
+因为在重设密码链接中, 邮件地址在params[:email]中, 如果使用后者, 就会把邮件地址放在params[:user][:email]中.
+
+为了正确渲染表单, 需要在PasswordResetsController的edit控制器中定义@user变量. 和账户激活一样, 我们要找到params[:email]
+中对应的用户, 确认这个用户已经激活, 然后用authenticated?方法认证params[:id]中的令牌. 因为edit和update动作中都要使用@user,
+所以我们要把用查找用户和认定令牌写入一个事前过滤器中.
+
+_代码清单10.49: 重设密码的edit动作 app/controllers/passwor\_resets\_controller.rb_
+
+    class PasswordResetController < ApplicationController
+      before_action :get_user, only:[:edit, :update]
+      brfore_action :valid_user, only: [:edit, :update]
+      ...
+      def edit
+      end
+
+      private
+        def get_user
+          @user = User.find_by(email: params[:email])
+        end
+
+        #确保是有效用户
+        def valid_user
+          unless (@user && @user.activated? &&
+                  @user.authenticated?(:reset, params[:id]))
+            redirect_to root_url
+          end
+        end
+    end
+
+edit动作对应的update动作要考虑四种情况:
+
+1. 密码重设超时失效
+
+2. 重设成功
+
+3. 密码无效导致的重设失败
+
+4. 密码和密码确认为空值是导致的重设失败(此时看起来像是成功了)
+
+因为这个表单会修改ActiveRecord模型, 所以我们可以使用共用的局部视图渲染错误消息. 密码和密码确认都为空值的情况比较特殊, 因为用户
+模型的验证允许出现这种情况, 所以要特别处理, 显示一个闪现消息.
+
+_代码清单10.50: 重设密码的update动作 app/controllers/password\_resets\_controller.rb_
+
+    class PasswordResetsController < ApplicationController
+      before_action :get_user, only: [:edit, :update]
+      before_action :valid_user, only: [:edit, :update]
+      before_action :check_expiration,only: [:edit, :update]
+
+      def new
+      end
+
+      def create
+        @user = User.find_by(email: params[:password_reset][:email.downcase])
+        if @user
+          @user.create_reset_digest
+          @user.send_password_reset_email
+          flash[:info]  = "Email sent with password reset instructions"
+          redirect_to root_url
+        else
+          flash.now[:danger] = "Email address not found"
+          render 'new'
+        end
+      end
+
+      def edit
+      end
+
+      def update
+        if both_passwords_blank?
+          flash.now[:danger] = "Password/confirmation can't be blank"
+          render 'edit'
+        elsif @user.update_attributes(user_params)
+          log_in @user
+          flash[:success] = "Password has been reset."
+          redirect_to @user
+        else
+          render 'edit'
+        end
+      end
+
+      provate
+
+        def user_params
+          params.requre(:user).permit(:password, :password_confirmation)
+        end
+
+        # 如果密码和密码确认都为空, 返回true
+        def both_passwords_blank?
+          params[:user][:password].blank? &&
+          params[:user][:password_confirmation].blank?
+        end
+
+        # 事前过滤器
+
+        def get_user
+          @user = User.find_by(email: params[:email])
+        end
+
+        # 确保是有效用户
+        def valid_user
+          unless (@user && @user.activated? &&
+                  @user.authenticated?(:reset, params[:id]))
+            redirect_to root_url
+          end
+        end
+
+        # 检查重设令牌是否过期
+        def check_expiration
+          if @user.passwor_reset_expired?
+            flash[:danger] = "Password reset has expired."
+            redirect_to new_password_reset_url
+          end
+        end
+    end
+
+我们把密码重设是否超时交给用户模型:
+
+    @user.password_reset_expired?
+
+所以要在用户模型中定义password\_reset\_expired?方法.
+
+_代码清单10.51: 在用户模型中定义password\_reset\_expired?方法 app/models/user.rb_
+
+    class User < ActiveRecord::Base
+      ...
+      # 若果密码重设超时失效了, 返回true
+      def password_reset_expired?
+        reset_sent_at < 2.houres.ago
+      end
+      private
+        ...
+    end
+
+## 10.2.5 测试
+
+编写一个继承测试覆盖两个分支: 重设失败和重设工程.
+
+    rails generate integration_test password_resets
+
+首先访问"Forgot Password"表单, 分别提交有效和无效的电子邮件地址, 电子邮件有效时要创建密码重设令牌, 并且发送重设邮件.
+然后访问邮件中的链接, 分别提交无效和有效的密码, 验证各自的表现是否正确.
+
+_代码清单10.52: 密码重设的集成测试 test/integration/password\_resets\_test.rb_
+
+    require 'test_helper'
+
+    class PasswordResetsTest < ActionDispatch::IntegrationTest
+      def setup
+        # 清空发送邮件计数器, 用于后面测试是否发送成功
+        ActionMailer::Base.deliveries.clear
+        @user = users(:michael)
+      end
+      test "password resets" do
+        get new_password_reset_path
+        assert_template 'password_resets/new'
+
+        # 电子邮件地址无效
+        post password_resets_path, password_reset: { email: "" }
+        assert_nor flash.empty?
+        assert_template 'password_resets/new'
+
+        # 电子邮件地址有效
+        post password_resets_path, password_reset: { email: @user.email }
+        assert_not_equal @user.reset_digest, @user.reload.reset_digest
+        assert_equal 1, ActionMailer::Base.deliveries.size
+        assert_not flash.empty?
+        assert_redirect_to root_url
+
+        # 密码重设表单
+        user = assigns(:user)
+
+        # 电子邮件地址错误
+        get edit_password_reset_path(user.reset_token, email: "")
+        assert_redirected_to root_url
+
+        # 用户未激活
+        user.toggle!(activated)
+        get edit_password_reset_path(user.reset_token, email: user.email)
+        assert_redirected_to root_url
+        user.toggle!(:activated)
+
+        # 电子邮件正确, 令牌不对
+        get edit_password_reset_path('wrong token', email: user.email)
+        assert_redirected_to root_url
+
+        # 电子邮件地址正确, 令牌正确
+        get edit_password_reset_path(user.reset_token, email: user.email)
+        assert_template 'password_resets/edit'
+
+      end
+    end
