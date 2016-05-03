@@ -4380,7 +4380,7 @@ _代码清单10.48: 重设密码的表单 app/views/password\_resets/edit.html.e
         </div>
     </div>
 
-注意, 使用的是
+'注意, 使用的是
 
     hidden_field_tag :email, @user.email
 
@@ -4394,7 +4394,7 @@ _代码清单10.48: 重设密码的表单 app/views/password\_resets/edit.html.e
 中对应的用户, 确认这个用户已经激活, 然后用authenticated?方法认证params[:id]中的令牌. 因为edit和update动作中都要使用@user,
 所以我们要把用查找用户和认定令牌写入一个事前过滤器中.
 
-_代码清单10.49: 重设密码的edit动作 app/controllers/passwor\_resets\_controller.rb_
+_代码清单10.49: 重设密码的edit动作 app/controllers/password\_resets\_controller.rb_
 
     class PasswordResetController < ApplicationController
       before_action :get_user, only:[:edit, :update]
@@ -4577,6 +4577,160 @@ _代码清单10.52: 密码重设的集成测试 test/integration/password\_reset
         # 电子邮件地址正确, 令牌正确
         get edit_password_reset_path(user.reset_token, email: user.email)
         assert_template 'password_resets/edit'
+        assert_select "input[name=email][type=hidden][value=?]", user.email
 
+        # 密码和密码确认不匹配
+        patch password_reset_path(user.reset_token),
+              email: user.email,
+              user: { password: "foobaz",
+                      password_confirmation: "barquux" }
+        assert_select 'div#error_exaplanation'
+
+        # 密码和密码确认都为空值
+        patch password_reset_path(user.reset_token),
+              email: user.email,
+              user: { password: " ",
+                      password_confirmation: " " }
+        assert_not flash.empty?
+        assert_template 'password_resets/edit'
+
+        # 密码和密码确认有效
+        patch password_reset_path(user.reset_token),
+              email: user.email,
+              user: { password: ""}
+        assert is_logged_in?
+        assert_not flash.empty?
+        assert_redirected_to user
       end
     end
+
+对于input标签的测试
+
+    assert_select "input[name=email][type=hidden][value=?]", user.email
+
+这行代码的意思是, 页面中又name属性, 类型(隐藏)和电子邮件地址都正确的input标签
+
+    <input id="email" name="email" type="hidden" value="michael@example.com" />
+
+_代码清单10.53: 测试 略_
+
+# 10.3 在生产环境中发送邮件
+
+后补
+
+# 10.4 小结
+
+本章实现了"注册-登陆-退出"机制.
+
+## 10.4.1 读完本章学到了什么
+
+* 和会话一样, 账户激活虽然没有对应的ActiveRecord对象, 但也可以看做一个资源
+
+* Rails可以生成ActionMailer动作和视图, 用于发送邮件
+
+* ActionMailer支持纯文本邮件和HTML邮件
+
+* 和普通的动作和视图一样, 在邮件程序的视图中也可以使用邮件程序动作中的实例变量
+
+* 和会话,账户激活一样, 密码重设虽然没有对应的ActiveRecord对象, 但也可以看做一个资源
+
+* 账户激活和密码重设都使用生成的令牌创建唯一的URL, 分别用于激活账户和重设密码
+
+* 邮件程序的测试和集成测试对确认邮件程序的表现都有用
+
+* 在生产环境中可以使用SendGrid发送电子邮件
+
+# 10.5 练习
+
+1. 填写代码清单10.55中缺少的代码, 为代码清单10.50中的密码重设超时失效分支编写集成测试(用到了response.body, 用来获取返回页面中的HTML).
+检查是否过期有很多方法, 上述代码使用的方法是检查响应主题中是否包含单词expired(不区分大小写).
+
+_代码清单10.55: 测试密码重设超时失效 test/integration/password\_resets\_test.rb_
+
+    require 'test_helper'
+
+    class PasswordResetsTest < ActionDispatch::IntegrationTest
+
+      def setup
+        ActionMailer::Base.deliveries.clear
+        @user = user(:michael)
+      end
+
+      ...
+
+      test "expired token" do
+        get new_password_reset_path
+        post password_resets_path, password_reset: { email: @user.email }
+
+        @user = assign(:user)
+        @user.update_attribute(:reset_sent_at, 3.hours.ago)
+        path password_reset_path(@user.reset_token),
+             email: @user.email,
+             user: { password: "foobar"
+                     password_confirmation: "foobar" }
+        assert_response :redirect
+        follow_redirect!
+        assert_match /expired/i, response.body
+      end
+    end
+
+2. 现在, 用户列表页面会显示所有用户, 而且各用户还可以通过/users/:id查看. 更合理的做法是只显示已激活的用户. 填写代码清单10.56中
+缺少的代码, 实现这一需求(代码中使用了ActiveRecord提供的where方法). 附加题: 为/users和/users/:id编写集成测试.
+
+_代码清单10.56: 只显示一ing激活的用户代码模板 app/controllers/users\_controller.rb_
+
+    class UsersController < ApplicationController
+
+      ...
+
+      def index
+        @users = User.where(activated: true).paginate(page: params[:page])
+      end
+
+      def show
+        @user = User.find(params[:id])
+        redirect_to root_url and return unless @user
+      end
+
+      ...
+
+    end
+
+3. 在代码清单10.40中, activate和create\_reset\_digest方法中调用了两次update\_attribute方法, 每次调用都要单独执行一个数据库事物,
+填写代码清单10.57中缺少的代码, 把这两个update\_attribute调用换成一个update\_columns, 这样之和数据库交互一次.
+
+_代码清单10.57: 使用update\_columns的代码模板_
+
+    class User < ActiveRecord::Base
+      attr_accessor :remember_token, :activation_token, :reset_token
+      before_save :downcase_email
+      before_create :create_activation_digest
+
+      ...
+
+      # 激活账户
+      def activate
+        update_columns(activated: true, activated_at: Time.zone.now)
+      end
+
+      # 发送激活邮件
+      def send_activation_email
+        UserMailer.account_activation(self).deliver_now
+      end
+
+      # 设置密码重设相关的属性
+      def create_reset_digest
+        self.reset_token = User.new_token
+        update_columns(reset_digest: User.new_token,
+                       reset_sent_at: Time.zone.now)
+      end
+
+      # 发送密码重设邮件
+      def send_password_reset_email
+        UserMailer.password_reset(self).deliver_now
+      end
+    end
+
+# 10.6 证明超时失效的比较算是
+
+后补
