@@ -4734,3 +4734,83 @@ _代码清单10.57: 使用update\_columns的代码模板_
 # 10.6 证明超时失效的比较算是
 
 后补
+
+# 11.1 微博模型
+
+新建一个分支
+
+    git checkout master
+    git checkout -b user-microposts
+
+## 11.1.1 基本模型
+
+微博模型需要两个属性: content, user_id
+
+|micorposts||
+|--|--|
+id|integer
+content|text
+user_id|integer
+created_at|datetime
+updated_at|datetime
+
+使用generate命令生成模型
+
+    rails generate model Micropost content:text user:references
+
+因为我们会按照发布时间的倒序查询某个用户发布的所有微博, 为了减少时间开销, 在迁移文件中为user_id和created_at创建索引.
+
+_代码清单11.1: 微博模型的迁移文件, 还创建了索引 db/migrate/[timestamp]\_create\_microposts.rb_
+
+    class CreateMicroposts < ActiveRecord::Migration
+      def change
+        create_table :microposts do |t|
+          t.text :content
+          t.references :user, index: true
+
+          t.timestamps null: false
+        end
+        add_index :microposts, [:user_id, :created_at]
+      end
+    end
+
+在创建迁移文件时使用了references类型, 会自动添加user_id列及其索引, 把用户和微博关联起来.
+
+## 11.1.2 微博模型的数据验证
+
+_代码清单11.2: 测试微博是否有效 test/models/micropost\_test.rb_
+
+    require 'test_helper'
+    class MicropostTest < ActiveSupport::TestCase
+      def setup
+        @user = users(:michael)
+        # 这行代码不符合常规做法
+        @micropost = Micropost.new(content: "Lorem ipsum", user_id: @user.id)
+      end
+
+      test "should be valid" do
+        assert @micropost.valid?
+      end
+
+      test "user id should be present" do
+        @micropost.user_id = nil
+        assert_not @micropost.valid?
+      end
+    end
+
+进行测试
+
+_代码清单11.3: 测试 略 RED_
+
+添加user\_in存在性验证, 使测试能够通过.
+
+_代码清单11.4: 微博模user\_id属性的验证 app/models/micropost.rb_
+
+    class Micropost < ActiveRecord::Base
+      belongs_to :user
+      validates :user, presence: true
+    end
+
+进行测试
+
+_代码清单11.5: 测试 略 GREEN_
