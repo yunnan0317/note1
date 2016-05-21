@@ -4818,7 +4818,7 @@ _代码清单11.5: 测试 略 GREEN_
 _代码清单11.6: 测试微博模型的验证 test/models/micropost\_test.rb_
 
     require 'test_helper'
-    class MicropostTest < ActiveSuport::TestCase
+    class MicropostTest < ActiveSupport::TestCase
       def setup
         @user = users(:michael)
         @micropost = @user.microposts.build(content: "Lorem ipsum")
@@ -4845,4 +4845,156 @@ _代码清单11.6: 测试微博模型的验证 test/models/micropost\_test.rb_
       end
     end
 
-_代码清单
+_代码清单11.7: 微博模型的验证 app/models/micropost.rb_
+
+    class Micropost < ActiveRecord::Base
+      belongs_to :user
+      validates :user_id, presence: true
+      validates :content, presence: true, length: { maximum: 140 }
+    end
+
+_代码清单11.8: 测试 略_
+
+## 11.1.3 用户和微博之间的关联
+
+_代码清单11.9： 微博belongs\_to用户_
+
+    class Micropost < ActiveRecord::Base
+      belongs_to :user
+      validates :user_id, presence: true
+      validates :content, presence: true, length { maximum: 140 }
+    end
+
+_代码清单11.10: 用户has\_many微博 app/models/user.rb_
+    class User < ActiveRecord::Base
+      has_many :microposts
+      ...
+    end
+
+_代码清单11.11: 使用正确的方式创建微博对象 /test/models/micropost\_test.rb_
+    require 'test_helper'
+    class MicropostTest < ActiveSupport
+      def setup
+        @user = users(:michael)
+        @micropost = @user.microposts.build(content: "Lorem ipsum")
+      end
+      ...
+    end
+
+_代码清单11.12: 测试 略_
+
+## 11.1.4 改进微博模型
+
+实现特定顺序取回用户微博, 实现微博隶属用户, 如果用户注销, 自动删除所有该用户的微博. 采用测试驱动开发.
+_代码清单11.13: 测试微博的排序 test/models/micropost\_test_
+
+    require 'test_helper'
+    class MicropostTest < ActiveSupport::TestCase
+      ...
+
+      test "order should be most recent first" do
+        assert_equal Micropost.first, microposts(:most_recent)
+      end
+    end
+
+上面代码要使用fixtures, 因此要先定义
+
+_代码清单11.14: 微博固件 test/fixtures/microposts.yml_
+
+    orange:
+      content: "I just aet an orange!"
+      created_at: <%= 10.minutes.ago %>
+    tau_manifesto:
+      content: "Check out the @ tauday sige by @mhartl: http://tauday.com"
+      created_at: <%= 3.years.ago %>
+    cat_video:
+      content: "Sad cats are sad: http://youtu.be/PKffm2uI4dk"
+      created_at: <%= 2.hours.ago %>
+    most_recent:
+      content: "Writing a short test"
+      created_at: <%= Time.zone.now %>
+
+这样测试还是不能够通过, 为了使测试通过. 要用default\_scope进行排序
+
+_代码清单11.16: 使用default\_scope排序微博 app/models/micropost.rb_
+
+    class Micropost < ActiveRecord::Base
+      belongs_to :user
+      default_scope -> { order(created_at: :desc) }
+      validates :user_id, presence: true
+      validates :content, presence: true, length: { maximum: 140 }
+    end
+
+上面代码中default\_scope语句使用了"->", 匿名函数.(重新看看)
+
+_代码清单11.17: 测试 略_
+
+接下来实现删除用户时, 也要把该用户发布的微博也删除.
+
+_代码清单11.18: 确保用户的微博在删除用户的同时也被删除 app/models/user.rb_
+
+    class User < ActiveRecord::Base
+      has_many :mircoposts, dependent: :destroy
+      ...
+    end
+
+进行测试
+
+_代码清单11.19: 测试dependent: :destroy test/models/user\_test.rb_
+
+    require 'test_helper'
+    class UserTest < ActiveSupport::TestCase
+      def setup
+        @user = User.new(name: "Example User", email: "user@example.com",
+                         password: "foobar", password_confirmation: "foobar")
+      end
+      ...
+      test "associated microposts should be destroyed" do
+        @user.save
+        @user.micropost.create!(content: "Lorem ipsum")
+        assert_difference 'Micropost.count', -1 do
+          @user.destroy
+        end
+      end
+    end
+
+_代码清单11.20: 测试 略_
+
+# 11.2 显示微博
+## 11.2.1 渲染微博
+
+要使用视图, 先生成控制器
+
+    rails generate controller Microposts
+
+_代码清单11.21: 渲染单篇微博的局部视图 app/views/microposts/\_micropost.html.erb_
+
+    <li id="micropost-<%= micropost.id %>">
+      <%= link_to gravatar_for(micropost.user, size: 50>, micropost.user %>
+      <span class="user"><%= link_to micropost.user.name, micropost.user %></span>
+      <span class="content"><%= micropost.content %></span>
+      <span class="timestamp>
+        Posted <%= time_ago_in_words(micropost.created_at) %> ago.
+      </span>
+    </li>
+
+对于显示多条微博, 需要使用分页will\_paginate, 用户分页时
+
+    <%= will_paginate %>
+
+这是因为will\_paginate假定已经存在一个名为@users的实力变量, 而现在要对微博分页. 应该把@microposts传递给will\_paginate方法.
+
+    <%= will_paginate @microposts %>
+
+同时要在控制器的show动作当中定义@micropost变量
+
+_代码清单11.22: 在用户控制器的show动作中定义@microposts变量 app/controllers/users\_controller.rb_
+
+    class UsersController < ApplicationController
+      ...
+      def show
+        @user = User.find(params[:id])
+        @microposts = @user.miroposts.paginate(page: params[:page])
+      end
+      ...
+    end

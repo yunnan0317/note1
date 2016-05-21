@@ -5,7 +5,7 @@
         # 设置用户名
         git config --global user.name "yunnan"
         # 设置邮箱地址
-        git config --global user.email yunnan03172gmail.com
+        git config --global user.email yunnan0317@gmail.com
         # 设置编辑器
         git config --global core.editor "emacs -w"
         # 设置co为checkout的简写
