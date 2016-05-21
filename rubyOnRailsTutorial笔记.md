@@ -4814,3 +4814,35 @@ _代码清单11.4: 微博模user\_id属性的验证 app/models/micropost.rb_
 进行测试
 
 _代码清单11.5: 测试 略 GREEN_
+
+_代码清单11.6: 测试微博模型的验证 test/models/micropost\_test.rb_
+
+    require 'test_helper'
+    class MicropostTest < ActiveSuport::TestCase
+      def setup
+        @user = users(:michael)
+        @micropost = @user.microposts.build(content: "Lorem ipsum")
+      end
+
+      test "should be valid" do
+        assert @micropost.valid?
+      end
+
+
+      test " user id should be present" do
+        @micropost。user_id = nil
+        assert_not @micropost.valid?
+      end
+
+      test "content should be present" do
+        @micropost.content = " "
+        assert_not @micropost.valid?
+      end
+
+      test "content should be at most 140 characters" do
+        @micropost.content = "a" * 141
+        assert_not @micropost.valid?
+      end
+    end
+
+_代码清单
