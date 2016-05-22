@@ -5002,3 +5002,282 @@ _代码清单11.22: 在用户控制器的show动作中定义@microposts变量 ap
 最后, 还要显示微博数量, 可以用`user.microposts.count`方法实现, 和paginate一样, count方法也可以在关联上使用. count的计数过程不是把所有的微博都从数据库中读取出来, 而是在数据库层计算, 让数据库统计制定的user\_id拥有多少微博.( 所有数据库都会对这种操作做性能优化, 如果统计数量仍然是应用的性能瓶颈, 可以使用"计数缓存"进一步提速.)
 
 现在可以把微博添加到资料页面了.
+
+_代码清单11.23: 在用户资料页面中加入微博 app/views/users/show.html.erb_
+
+    <% provide(:title, @user.name) %>
+    <div class="row">
+        <aside class="col-md-4">
+            <section class="user_info">
+                <h1>
+                    <%= gravatar_for @user %>
+                    <%= @user.name %>
+                </h1>
+            </section>
+        </aside>
+        <div class="col-md-8">
+            <% if @user.microposts.any? %>
+                <h3>Microposts (<%= @user.microposts.count %>)</h3>
+                <ol class="microposts">
+                    <%= render @microposts %>
+                </ol>
+                <%= will_paginate @microposts %>
+            <% end %>
+        </div>
+    </div>
+
+由于用户中现在没有微博, 所以用户资料页面无法显示.
+
+## 11.2.2 显示微博
+
+添加示例微博
+
+_代码清单11.24: 添加示例微博 db/seeds/rb_
+
+    ...
+    users = User.oreder(:created_at).take(6)
+    50.times do
+      content = Faker::Lorem.sentence(5)
+      users.each { |user| user.microposts.create!(content: content) }
+    end
+
+把种子数据写入开发数据库
+
+    bundle exec rake db:migrate:reset
+    bundle exec rake db:seed
+
+重启开发服务器, 然后为微博添加一下样式
+
+_代码清单11.25: 微博的样式(包含本章所有要使用的CSS) app/assets/stylesheets/custom.css.scss_
+
+    ...
+    /* microposts */
+    .micropsts {
+      list-sytle: none;
+      padding: 0;
+      li {
+        padding: 10px 0;
+        border-top: 1px solid #e8e8e8;
+        }
+      .user {
+        margin-top: 5em;
+        padding-top: 0;
+        }
+      .content {
+        display: block;
+        margin-left: 60px;
+        img {
+          display: block;
+          padding: 5px 0;
+          }
+        }
+      .timestamp {
+        color: $gray-light;
+        display: block;
+        margin-left: 60px;
+        }
+      .gravatar {
+        float: left;
+        margin-right: 10px;
+        margin-top: 5px;
+        }
+      }
+    aside {
+      testarea {
+        height: 100px;
+        margin-bottom: 5px;
+        }
+      }
+    span.picture {
+      margin-top: 10px;
+      input {
+        border: 0;
+        }
+      }
+
+## 11.2.3 资料页面中微博的测试
+
+先生成资料页面的集成测试
+
+    rails generate integration_test users_profile
+
+为了测试页面中有微博, 要把微博firture和用户关联, 使用
+
+    orange:
+      content: "I just ate an orange!"
+      created_at: <%= 10.minutes.ago %>
+      user: michael
+
+修改后的微博fixture
+
+_代码清单11.26: 添加关联用户后的微博固件 test/fixtures/microposts.yml_
+
+    orange:
+      content: "I just ate an orange!"
+      created_at: <%= 10.minutes.ago %>
+      user: michael
+
+    tau_minafesto:
+      content: "Check out the @tauday site by @mhartl: http://tauday.com"
+      created_at: <%= 3.years.ago %>
+      user: michael
+
+    cat_video:
+      content: "Sad cats are sad: http://youtu.be?PKffm2uI4dk"
+      created_at: <%= 2.hours.ago %>
+      user: michael
+
+    most_recent:
+      content: "Writing a short test"
+      created_at: <%= Time.zone.now %>
+      user: michael
+
+    <% 30.times do |n| %>
+    micropost_<%= n %>:
+      content: <%= Faker::Lorem.sentence(5) %>
+      created_at: <%= 42.days.ago %>
+      user: michael
+    <% end %>
+
+测试数据准备好了, 测试: 访问资料页面, 检查页面标题, 用户名字, Gravatar头像, 微博数量和分页显示的微博.
+"
+_代码清单11.27: 用户资料页面的测试 test/integration/users\_profile\_test.rb_
+
+    require 'test_helper'
+    class UsersProfileTest < ActionDispatch::IntegrationTest
+      include ApplicationHelper
+      def setup
+        @user = users(:michael)
+      end
+      test "profile display" do
+        get user_path(@user)
+        assert_template 'users/show'
+        assert_select 'title', full_title(@user.name)
+        assert_select 'h1', hext: @user.name
+        assert_select 'h1>img.gravatar'
+        assert_match @user.microposts.count.to_s, response.body
+        assert_select 'div.pagination'
+        @user.microposts.paginate(page: 1).each do |micropost|
+          assert_match micropost.content, response.body
+        end
+      end
+    end
+
+_代码清单11.28: 测试 略_
+
+# 11.3 微博相关的操作
+
+接下来实现网页发布微博, 以及在网页中删除微博的功能.
+
+注意: 微博资源相关的页面不通过微博控制器实现, 而是通过资料页面和首页实现, 因此微博控制器不需要new和edit动作, 只需要create和destroy动作.
+
+_代码清单11.29: 微博资源的路由设置 config/routes.rb_
+
+    Rails.application.routes.draw do
+      root 'static_pages#home'
+      get 'help' => 'static_pages#help'
+      get 'about' => 'static_page#about'
+      get 'contact' => 'static_page#contact'
+      get 'signup' => 'users#new'
+      get 'login' => 'sessions#new'
+      post 'login' => 'sessions#create'
+      delete 'logout' => 'sessions#destroy'
+      resources :users
+      resources :account_activations, only: [:edit]
+      resources :password_resets, only: [:new, :create, :edit, :update]
+      resources :microposts, only: [:create, :destroy]
+    end
+
+## 11.3.1 访问限制
+
+若想访问create和destroy动作, 用户要先登陆.
+
+_代码清单11.30: 微博控制器的访问限制测试 test/controllers/microposts\_controller\_test.rb_
+
+    require 'test_helper'
+    class MicropostsControllerTest < ActionController::TestCase
+      def setup
+        @micropost = microposts(:orange)
+      end
+
+      test "should redirect create when not logged in" do
+        assert_no_difference 'Micropost.count' do
+          post :create, micropost: { content: "Lorem ipsum" }
+        end
+        assert_redirected_to login_url
+      end
+
+      test "should redirect destroy when not logged in" do
+        assert_no_difference 'Micropost.count' do
+          delete :destroy, id: @micropost
+        end
+        assert_redirected_to login_url
+      end
+    end
+
+之前我们曾经定义过一个事前过滤器logged\_in\_user, 要求访问edit等动作前用户要先登陆. 当时只需要在用户控制器中使用, 但是现在要在微博控制器中也使用, 所以把它转义到ApplicationController中.
+
+_代码清单11.31: 把logged\_in\_user方法移到ApplicationController中 app/controllers/application\_controller.rb_
+
+    class ApplicationController < ActionController::Base
+      protectrom_forgery with: :exception
+      include SessionsHelper
+
+      private
+        # 确保用户已经登陆
+        def logged_in_user
+          unless logged_in?
+            store_location
+            flash[:danger] = "Please log in"
+            redirect_to login_url
+          end
+        end
+    end
+
+同时要把用户控制器的logged\_in\_user方法删掉. 现在我们可以在微博控制器中添加create动作和destroy动作, 并使用事前过滤器限制访问.
+
+_代码清单11.32: 限制访问微博控制器的动作 app/controllers/microposts\_controller.rb_
+
+    class MicropostsController < ApplicationController
+      before_action :logged_in_user, only: [:create, :destroy]
+
+      def create
+      end
+
+      def destroy
+      end
+    end
+
+现在测试组件应该能通过了
+
+_代码清单11.33: 测试 略_
+
+## 11.3.2 创建微博
+
+表单不放再单独的页面/microposts/new中, 而是在网站的首页.
+先来编写微博控制器的create动作(与用户控制器的create动作类似), 主要区别是: 创建微博时, 要使用用户和微博的关联关系构建微博对象.
+注意micropost_params中的简装参数, 只允许通过Web修改微博的content属性
+
+_代码清单11.34: 微博控制器的create动作 app/controllers/microposts\_controller.rb_
+
+    class MicropostsController < ApplicationController
+      before_action :logged_in_user, only: [:create, :destroy]
+
+      def create
+        @micropost = current_user.microposts.bulid(micropost_params)
+        if @micropost.save
+          falsh[:success] = "Micropost created!"
+          redirect_to root_url
+        else
+          render 'static_pages/home'
+        end
+      end
+
+      def destroy
+      end
+
+      private
+        def micropost_params
+          params.require(:micropost).permit(:content)
+        end
+    end
