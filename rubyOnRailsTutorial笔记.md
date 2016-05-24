@@ -5281,3 +5281,198 @@ _代码清单11.34: 微博控制器的create动作 app/controllers/microposts\_c
           params.require(:micropost).permit(:content)
         end
     end
+
+编写创建微博所需的表单
+
+_代码清单11.35: 在首页加入创建微博的表单 app/views/ststic\_pages/home.html.erb_
+
+    <% if logged_in? %>
+        <div class="row">
+            <aside class="col-md-4">
+                <section class="user_info">
+                    <%= render 'shared/user_info' %>
+                </section>
+                <section class="micropost_form">
+                    <%= render 'shared/micropost_form' %>
+                </section>
+            </aside>
+        </div>
+    <% else %>
+        <div class="center jumbotron">
+            <h1>Welcome to the Sample App</h1>
+
+            <h2>
+                this is the home page for the
+                <a href="http://www.railstutorial.org/">Ruby on Rails Tutorial</a>
+                sample application
+            </h2>
+
+            <%= link_to "sign up now!", signup_path, class: "btn btn-lg btn-primary" %>
+        </div>
+
+        <%= link_to image_tag("rails.png", alt: "Rails logo"), 'http://rubyonrails.org/' %>
+    <% end %>
+
+上述代码中用到了\_user\_info.html.erb局部视图, \_micripost\_form.html.erb局部视图. 一一完成.
+
+_代码清单11.36: 用户信息侧边栏局部视图 app/views/shared/\_user\_info.html.erb_
+
+    <%= link_to gravatar_for(current_user, size: 50), current_user %>
+    <h1><%= current_user.name %></h1>
+    <span><%= link_to "view my profile", current_user %></span>
+    <span><%= pluralize(current_user.microposts.count, "micropost") %></span>
+
+第七章中用到过pluralize方法, 显示成"1 micropost", "2 microposts"等.
+
+_代码清单11.37: 微博创建表单局部视图 app/views/shared/\_micropost\_form.html.erb_
+
+    <%= form_for(@micropost) do |f| %>
+        <%= render 'shared/error_messages', object: f.object %>
+        <div class="field">
+            <%= f.text_area :content, placeholder: "Compose new micropost..." %>
+        </div>
+        <%= f.submit "Post", class: "btn btn-primary" %>
+    <% end %>
+
+还需要做两件事, 上述代码才能使用. 一是通过关联定义@micropost变量. 二是重写error\_messages局部视图.
+
+_代码清单11.38: 在home动作中定义@micropost实例变量 app/controllers/static\_pages\_controller.rb_
+
+    class StaticPagesController < ApplicationController
+      def home
+        @micropost = current_user.microposts.build if logged_in?
+      end
+
+      def help
+      end
+
+      def about
+      end
+
+      def contact
+      end
+
+    end
+
+_代码清单11.39: 能使用其他对象的错误消息局部视图 app/views/shared/\_error\_message.html.erb_
+
+    <% if object.errors.any? %>
+        <div id="error_explanation">
+            <div class="alert alert-danger">
+                The form contains <%= pluralize(object.errors.count, "error") %>.
+            </div>
+            <ul>
+                <% object.errors.full_messages.each do |msg| %>
+                    <li><%= msg %></li>
+                <% end %>
+            </ul>
+        </div>
+    <% end %>
+
+_代码清单11.40 测试 无法通过_
+
+接下来修改错误消息局部视图的渲染方式, 包括: 用户视图, 重设密码视图, 编辑用户视图
+
+_代码清单11.41: 修改用户注册表单中渲染错误消息局部视图的方式 app/views/users/new.html.erb_
+
+    <% provide(:title, 'Sign up') %>
+    <h1>Sign up</h1>
+
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <%= form_for(@user) do |f| %>
+            <%= render 'shared/error_messages', object: f.object %>
+
+            <%= f.label :name %>
+            <%= f.text_field :name, class: 'form-control' %>
+
+            <%= f.label :email %>
+            <%= f.text_field :email, class: 'form-control' %>
+
+            <%= f.label :password %>
+            <%= f.password_field :password, class: 'form-control' %>
+
+            <%= f.label :password_confirmation, "Confirmation" %>
+            <%= f.password_field :password_confirmation, class: 'form-control' %>
+
+            <%= f.submib "Create my account", class: 'btn btn-primary' %>
+            <% end %>
+        </div>
+    </div>
+
+_代码清单11.42: 修改遍历用户表单中渲染错误消息局部视图的方式 app/views/users/edit.html.erb_
+
+    <% provide(:title, "Edit user") %>
+    <h1>Update your profile</h1>
+
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3"">
+            <%= form_for(@user) do |f| %>
+            <%= render 'shared/error_messages', object: f.object %>
+
+            <%= f.label :name %>
+            <%= f.text_field :name, class: 'form-control' %>
+
+            <%= f.label :email %>
+            <%= f.text_field :email, class: 'form-control' %>
+
+            <%= f.label :password %>
+            <%= f.password_field :password, class: 'form-control' %>
+
+            <%= f.label :password_confirmation, "Confirmation" %>
+            <%= f.password_field :password_confirmation, class: 'form-control' %>
+
+            <%= f.submit "Save changes", class: 'btn btn-primary' %>
+            <% end %>
+            <div class="gravatar_edit">
+                <%= gravatar_for @user %>
+                <a href="http:/gravatar.com/emails">change</a>
+            </div>
+        </div>
+    </div>
+
+_代码清单11.43: 修改密码重设表单中渲染错误消息局部视图的方式 app/views/password\_resets/edit.html.erb_
+
+    <% provide(:title, 'Reset password') %>
+    <h1>Password reset</h1>
+
+    <div class="row">
+        <div class="col-md-6 col-md-offset-3">
+            <%= form_for(@user, url: password_reset_path(params[:id])) do |f| %>
+
+            <%= render 'shared/error_messages', object: f.object %>
+
+            <%= hidden_field_tag :email, @user.email %>
+
+            <%= f.label :password %>
+            <%= f.password_field :password, class: 'form-control' %>
+
+            <%= f.label :password_confirmation, "Confirmation" %>
+            <%= f.password_field :password_confirmation, class: 'form-control' %>
+
+            <%= f.submit "Update password", class: "btn btn-primary" %>
+            <% end %>
+        </div>
+    </div>
+
+## 11.3.3 动态流原型
+
+实现在首页显示一个含有当前登入用户的微博列表(动态流).'
+
+_代码清单11.44: 微博动态流的初步实现 app/models/users.rb_
+
+    class User < ActiveRecord::Base
+      ...
+      # 实现动态流原型
+      # 完整的实现参见第12章
+      def feed
+        Micropost.where("user_id = ?", id)
+      end
+
+      private
+        ...
+
+    end
+
+代码`Micropost.where("user_id = ?", id)`中的问号确保id值在传入底层的SQL查询语句之前做了适当的转义, 避免"SQL注入(SQL injection)"这样严重的安全隐患.
+这里用到的id属性是个整数, 实际没有什么危险, 但是在SQL语句中引入变量之前做转义是个好习惯.
