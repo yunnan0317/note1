@@ -5476,3 +5476,94 @@ _代码清单11.44: 微博动态流的初步实现 app/models/users.rb_
 
 代码`Micropost.where("user_id = ?", id)`中的问号确保id值在传入底层的SQL查询语句之前做了适当的转义, 避免"SQL注入(SQL injection)"这样严重的安全隐患.
 这里用到的id属性是个整数, 实际没有什么危险, 但是在SQL语句中引入变量之前做转义是个好习惯.
+
+实际上上述代码和下面是等效的
+
+    def feed
+      microposts
+    end
+
+之所以使用上面的性质, 因为它能更好的服务于12章的完整动态流.
+
+要获取动态流, 可以在home动作中定义一个@feed\_items实例变量, 分页获取当前用户的微博.
+
+_代码清单11.45: 在home动作中定义一个实例变量, 获取动态流 app/controlers/static\_pages\_controller.rb_
+
+    class StaticPagesController < ApplicationController
+      def home
+        if logged_in?
+          @micropost = current_user.microposts.build
+          @feed_items = current_user.feed.paginate(page: prarams[:page])
+        end
+      end
+
+      def help
+      end
+
+      def about
+      end
+
+      def contact
+      end
+    end
+
+_代码清单11.46: 动态流局部视图 app/views/shared/\_feed.html.erb_
+
+    <% if @feed_items.any? %>
+    <ol class="microposts">
+        <%= render @feed_items %>
+    </ol>
+    <%= will_paginate @feed_items %>
+    <% end %>
+
+代码`<%= render @feed_items %>`中@feed\_items中的元素都是Micropost类的实例, 因此Rails会在对应则资源视图文件夹中寻找正确的局部视图(代码清单11.21).
+
+最后在首页加入动态流
+
+_代码清单11.47: 在首页加入动态流 app/views/static\_pages/home.html.erb_
+
+    <% if logged_in? %>
+    <div class="row">
+        <aside class="col-md-4">
+            <section class="user_info">
+                <%= render 'shared/user_info' %>
+            </section>
+            <section class="micropost_form">
+                <%= render 'shared/micropost_form' %>
+            </section>
+        </aside>
+        <div class="clo-md-8">
+            <h3>Micropost Feed</h3>
+            <%= redner 'shared/feed' %>
+        </div>
+    </div>
+    <% else %>
+    ...
+    <% end %>
+
+一切都可以运行了, 不过如果发布微博失败, 首页还需要@feed\_items的实例变量, 因此如果提交失败就把@feed\_item初始化为空数组.'
+
+_代码清单11.48: 在create动作中定义@feed_items实例变量, 值为空 app/controller/microposts\_controller.rb_
+
+    class MicropostsController < ApplicationController
+      before_action :logged_in_user, only: [:create, :destroy]
+
+      def create
+        @micropost = current_user.microposts.build(micropost_params)
+        if @micropost.save
+          flash[:success] = "Micropost created!"
+          redirect_to root_url
+        else
+          @feed_items =[]
+          render 'static_pages/home'
+        end
+      end
+
+      def destroy
+      end
+
+      private
+        def micropost_params
+          params.require(:micropost).permit(:content)
+        end
+    end
