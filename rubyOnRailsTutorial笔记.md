@@ -5567,3 +5567,125 @@ _代码清单11.48: 在create动作中定义@feed_items实例变量, 值为空 a
           params.require(:micropost).permit(:content)
         end
     end
+
+## 11.3.4 删除微博
+
+微博资源的最后一个功能, 删除. 只有微博发布人才能删除. 首先在是图中插入删除链接.
+
+_代码清单11.49: 在微博局部视图中添加删除链接 app/views/microposts/\_micropost.html.erb_
+
+    <li id="<%= micropost.id %>">
+        <%= link_to gravatar_for(micropost.user, size: 50), micropost.user %>
+        <span class="user"><%= link_to micropost.user.name, micropost.user %></span>
+        <span class="content"><%= micropost.content %></span>
+        <span class="timestamp">
+            Posted <%= time_ago_in_words(micropost.created_at) %> ago.
+            <% if current_user?(micropost.user) %>
+              <%= link_to "delete", micropost, method: delete, data: { confirm: "You sure?"} %>
+            <% end %>
+        </span>
+    </li>
+
+编写MicropostContrller中的destroy动作, 把查找微博的操作放在correct_user事前过滤器中, 确保当前用户确实拥有指定ID的微博
+
+_代码清单11.50: MicropostsController的destroy动作 app/controolers/microposts\_controller.rb_
+
+    class MicropostsController < ApplicationController
+      before_action :logged_in_user, only: [:create, :destroy]
+      before_action :correct_user, only: :destroy
+      ...
+      def destroy
+        @micropost.destroy
+        flash[:success] = "Micropost deleted"
+        redirect_to request.referrer || root_url
+      end
+
+      private
+        def micropost_params
+          params.require(:micropost).permit(:content)
+        end
+
+        def correct_user
+          @micropost = current_user.microposts.find_by(:id: params[:id])
+          redirect_to root_url if @micropost.nil?
+        end
+    end
+
+注意, 在destroy中重定向的地址是: `request.referrer || root_url`. request.referrer和实现友好转向时使用的request.url关系紧密,
+表示前一个URL(这里是首页).
+
+## 11.3.4 微博的测试
+
+编写一个微博控制器测试, 检查权限限制; 一个集成测试, 检查整个操作流程.
+
+_代码清单11.51: 添加几个由不同用户发布的微博 test/fixtures/microposts.yml_
+
+    ...
+    ants:
+      content: "Oh, is that what you want? Because that's how you get ants!"
+      created_at: <%= 2.years.ago %>
+      user: archer
+
+    zone:
+      content: "Danger zone!"
+      created_at: <%= 3.days.ago %>
+      user: archer
+
+    tone:
+      content: "I'm sorry. Your words made sense, but your sarcastic tone did not."
+      created_at: <%= 10.minutes.ago %>
+      user: lana
+
+    van:
+      content: "Dude, this van's, like, rolling probable cause."
+      created_at: <%= 4.hours.ago %>
+      user: lana
+
+然后就可以编写控制器测试了.
+
+_代码清单11.52: 测试用户不能删除其他用户的微博 test/controllers/microposts\_controller\_test.rb_
+
+    require 'test_helper'
+    class MicropostsControllerTest < ActionController:TestCase
+      def setup
+        @micropost = microposts(:orange)
+      end
+
+      test "should redirect create when not logged in" do
+        assert_no_difference 'Micropost.count' do
+          post :create, micropost: { content: "Lorem ipsum" }
+        end
+        asssert_redirected_to login_url
+      end
+
+      test "should redirect destroy when not logged in" do
+        assert_no_difference 'Micropost.count' do
+          delete :destroy, id: @micropost
+        end
+        assert_redirected_to login_url
+      end
+
+      test "should redirect destroy for wrong micropost" do
+        log_in_as(users(:michael))
+        micropost = microposts(:ants)
+        assert_no_difference 'Micropost.count' do
+          delete :destroy, id: micropost
+        end
+        assert_redirected_to root_url
+      end
+    end
+
+最后编写一个集成测试:
+
+1. 登陆
+2. 检查是否有分页链接
+3. 提交有效微博检查数量
+4. 提交无效微博检查数量
+5. 删除微博检查数量
+6. 访问另一个用户的资料页面, 检查是否有删除链接
+
+成测试文件`rails generate integration_test microposts_interface`.
+
+_代码清单11.53: 微博资源界面的继承测试 test/ingtegration/microposts\_interface\_test.rb_
+
+    require 'test_helper'
