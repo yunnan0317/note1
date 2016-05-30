@@ -3495,7 +3495,7 @@ _代码清单10.4 激活种子数据中的用户 db/seeds.rb_
 
     michael:
       name: Michael Example
-      email: michaed@example.com
+      email: michael@example.com
       password_digest: <%= User.digest('password') %>
       admin: true
       activated: true
@@ -5689,3 +5689,118 @@ _代码清单11.52: 测试用户不能删除其他用户的微博 test/controlle
 _代码清单11.53: 微博资源界面的继承测试 test/ingtegration/microposts\_interface\_test.rb_
 
     require 'test_helper'
+    class MicropostsInterfaceTest < ActionDispatch::IntegrationTest
+      def setup
+        @user = users(:michael)
+      end
+
+      test "micropost interface" do
+        # 登录用户
+        log_in_as(@user)
+        get root_path
+        # 测试是否有分页标签
+        assert_select 'div.pagination'
+        # 无效提交, 微博数量不会改变
+        assert_no_difference 'Micropost.count' do
+          post microposts_path, micropost: { content: "" }
+        end
+        # 测试是否有报错的标签
+        assert_select 'div#error_explanation'
+        # 有效提交, 微博数量增加1
+        content = "This micropost really ties the room together"
+        assert_difference 'Micropost.count', 1 do
+          post microposts_path, micropost: { content: content }
+        end
+        # 测试发布微博后重定向
+        assert_redirected_to root_url
+        # 跟随重定向
+        follow_redirect!
+        # 测试body中含有发布的微博内容
+        assert_match content, response.body
+        # 删除一篇微博
+        assert_select 'a', text: 'delete'
+        first_microposts = @user.microposts.paginate(page: 1).first
+        # 测试删除微博
+        assert_difference 'Micropost.count', -1 do
+          delete micropost_path(first_micropost)
+        end
+        # 访问另一个用户的资料页面
+        get user_path(users(:archer))
+        assert_select 'a', text: 'delete', count: 0
+      end
+    end
+
+最后进行测试
+
+_代码清单11.54: 测试 略_
+
+# 11.4 微博中的图片
+## 11.4.1 基本的图片上传功能
+
+我们要使用CarrierWave处理图片. 添加gem
+
+_代码清单11.55: 在Gemfile中添加CarrierWave_
+
+    source 'http://rubygems.org'
+
+    gem 'rails', '4.2.0'
+    gem 'bcrypt', '3.1.7'
+    gem 'faker', '1.4.2'
+    # 图片上传
+    gem 'carrierwave', '0.10.0'
+    # 调整图片尺寸
+    gem 'mini_magick', '3.8.0'
+    # 在生产环境中上传图片
+    gem 'fog', '1.23.0'
+    gem 'will_paginate', '3.0.7'
+    gem 'boostrap-will_paginate', '0.0.10'
+    ...
+
+执行`bundle install`. CarrierWave含有一个Rails生成器, 用于生成图片上传程序, 我们要创造一个名为picture的上传程序`rails generate uploader Picture`.
+
+CarrierWaver上传的图片应该对应于ActiveRecord模型中的一个属性, 这个属性只需存储图片的文件名字符串.
+
+|micropost|
+|--------|--|
+|id|integer|
+|content|text|
+|user\_id|integer|
+|created\_at|datetime|
+|updated\_at|datetime|
+|picture|string|
+
+添加picture属性到微博模型中
+
+    rails generate migration add_picture_to_microposts picture:string
+    bundle exec rake db:migrate
+
+告诉CarrierWave把图片和模型关联起来的方式是使用mount\_uploader. 第一个参数是属性的符号形式, 第二个参数是上传程序的类名. `mount_uploader :picture, PictureUploader`. 把上传程序添加到微博模型.
+
+_代码清单11.56: 在微博模型中添加图片上传程序 app/models/micropost.rb_
+
+    class Micropost < ActiveRecord::Base
+      belongs_to :user
+      default_scope -> { order(created_at: :desc) }
+      mount_uploader :picture, PictureUploader
+      validates :user_id, presence: true
+      validates :content, presence: true, length: { maximum: 140 }
+    end
+
+为了在首页添加图片上传功能, 我们需要在发布微博的表单中添加一个file\_field标签.
+
+_代码清单11.57: 在发布微博的表单中添加图片上传按钮 app/views/shared/\_micropost\_form.html.erb_
+
+    <%= form_for(@micropost, html: {multipar: true}) do |f| %>
+      <%= render 'shared/error_messages', object: f.object %>
+      <div class="field">
+          <%= f.text_area :content, placeholder: "Compose new micropost..." %>
+      </div>
+      <%= f.submit "Post", class: "btn btn-primary" %>
+      <span class="picture">
+          <%= f.flie_field :picture%>
+      </span>
+    <% end %>
+
+form\_for中指定了html: { multipart: true }参数. 为了支持文件上传, 必须指定. 最后把picture属性添加到可以通过Web修改的属性.
+
+_代码清单11.58: 把picture添加到允许修改的属性列表中 app/controllers/microposts\_controller.rb_
