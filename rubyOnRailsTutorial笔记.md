@@ -5804,3 +5804,37 @@ _代码清单11.57: 在发布微博的表单中添加图片上传按钮 app/view
 form\_for中指定了html: { multipart: true }参数. 为了支持文件上传, 必须指定. 最后把picture属性添加到可以通过Web修改的属性.
 
 _代码清单11.58: 把picture添加到允许修改的属性列表中 app/controllers/microposts\_controller.rb_
+
+    class MicropostsController < ApplicationController
+      before_action :logged_in_user, only: [:create, :destroy]
+      before_action :correct_user, only: :destroy
+      ...
+      private
+        def micropost_params
+          params.require(:micropost).permit(:content, :picture)
+        end
+
+        def correct_user
+          @micropost = current_user.microposts.find_by(id: params[:id])
+          redirect_to root_url if @micropost.nil?
+        end
+    end
+
+上传图片后, 微博局部视图中可以使用image\_tag辅助方法渲染. 注意, 使用了picture?布尔值方法, 不过没有图片, 就不会显示img标签. 这个方法由CarrierWave自动创建, 方法名根据保存图片文件名的属性而定.
+
+_代码清单11.59: 在微博中显示图片 app/view/microposts/\_micropost.html.erb_
+
+    <li id="micropost-<%= micropost.id %>">
+        <%= link_to gravatar_for(micropost.user, size: 50), micropost.user %>
+        <span class="user"><%= link_to micropost.user.name, micropost.user %></span>
+        <span class="content">
+            <%= micropost.content %>
+            <%= image_tag micropost.picture.url if micropost.picture? %>
+        </span>
+        <span class="timestamp">
+            Posted <%= time_ago_in_words(micropost.created_at) %> ago.
+            <% if cureent_user?(micropost.user) %>
+              <%= link_to "delete , micropost, method: delete, data: { confirm: "You sure?" }%>
+            <% end %>
+        </span>
+    </li>
