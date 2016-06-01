@@ -3453,7 +3453,7 @@ _代码清单10.3: 在用户模型中添加账户激活相关的代码 app/model
       attr_accessor :remember_token, :activation_token
       before_save :downcase_email
       before_create :create_activation_digest
-      vlidates :name, presence: true, length: { maximum: 50 }
+      validates :name, presence: true, length: { maximum: 50 }
       ...
       private
         # 将email地址转换成小写
@@ -3779,7 +3779,7 @@ _代码清单10.20: 临时注释掉失败的测试 test/integration/users\_signu
        assert_select 'div#error_explanation'
        assert_select 'div.field_with_errors'
      end
-     test "vlida signup information" do
+     test "valid signup information" do
        get signup_path
        assert_difference 'User.count' 1 do
          post_via_redirect users_path, user: { name: "Example User",
@@ -5838,3 +5838,99 @@ _代码清单11.59: 在微博中显示图片 app/view/microposts/\_micropost.htm
             <% end %>
         </span>
     </li>
+
+
+## 11.4.2
+
+添加验证, 限制图片的大小和类型, 同时在服务器端和客户端添加验证.
+
+对图片类型的限制在CarrierWave的上传程序中设置, 要限制图片的扩展名(.png, .gif)
+
+_代码清单11.60: 限制可上传的图片类型 app/uploaders/picture\_uploader.rb_
+
+    class PictureUploader < CarrierWave::Uploader::Base
+      storeage :file
+
+      # Override the directory where uploaded files will be store.
+      # This is a sensible default for uploaders that are meant to be mounted:
+      def store_dir
+        "uploads/#{model.class.to_s.underscore}/#{mounted_as}/#{model.id}"
+      end
+
+      # 添加一个白名单, 制定允许上传的图片类型
+      def extension_white_list
+        %w(jpg jpeg gif png)
+      end
+    end
+
+图片的大小限制在微博模型中设定, Rails没有为文件大小提供现成的验证方法, 需要自定义, 命名为picture\_size, 调用定义方法使用validate而不是validates.
+
+    class Micropost < ActiveRecord::Base
+      belongs_to :user
+      default_scope -> { order(created_at: :desc) }
+      mount_uploader :picture, PictureUploader
+      validates :user_id, presence: true
+      validates :content, presence: true, length: { maximum: 140 }
+      validate :picture_size
+
+      private
+        def picture_size
+          if picture.size > 5.megabytes
+            errors.add(:picture, "should be less than 5MB")
+          end
+        end
+    end
+
+在客户端检查上传的图片. 首先在file\_field方法中使用accept限制图片格式(有效格式使用MIME类型指定). 然后编写JavaScript(更确切额说是jQuery代码)来限制大小.
+
+_代码清单11.62: 使用jQuery检查文件大小 app/views/shared/\_micropost\_form.html.erb_
+
+    <%= form_for(@micropost, html: { multipart: true }) do |f| %>
+    <%= render 'shared/error_messages', object: f.object %>
+    <div class="field">
+        <%= f.text_area :content, placeholder: "Compost new micropost..." %>
+    </div>
+    <%= f.submit "Post", class: "btn btn-primary" %>
+    <span class="picture">
+        <%= f.field :picture, accept: 'image/jpeg, image/gif, image/png' %>
+    </span>
+    <% end %>
+
+    <script type="text/javascript">
+     $('#micropost_picture').bind('change', function(){
+         size_in_megabytes = this.files[0].size/1024/1024;
+         if (size_in_megabytes > 5) {
+             alert('Maximum file size is 5MB. Please choose a smaller file.');
+         }
+     });
+    </script>
+
+## 11.4.3 调整图片尺寸
+
+注意, 如果要在开发环境和生产环境中ImageMagick的安装. 然后要在CarrierWave中引入MiniMagick为ImageMagick提供的接口, 还要调用一个调整尺寸的方法.
+
+_代码清单11.63: 配置图片上传程序, 调整图片的尺寸 app/uploaders/picture\_uploader.rb_
+
+    class PictureUploader < CarrierWave::Uploader::Base
+      include CarrierWave::MiniMagick
+      process resize_to_limit: [400, 400]
+
+      storage :file
+
+      # Override the directory where uploaded files will be stored.
+      # This is a sensible default for uploaders that are meant to be mounted:
+      def store_dir
+        "uploads/#{model.class.to_s.underscore}/#{mount_as}/#{model.id}"
+      end
+
+      # 添加一个白名单, 指定允许上传的图片类型
+      def extension_white_list
+        %w(jpg jpeg gif png)
+      end
+    end
+
+## 11.4.4 在生产环境中上传图片
+
+略
+
+# 11.4 小结
