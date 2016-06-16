@@ -5,8 +5,8 @@
 
 _代码清单3.1: 创建一个新应用_
 
-        # 选择4.2.0创建新应用
-        rails _4.2.0_ new sample_app
+    # 选择4.2.0创建新应用
+    rails _4.2.0_ new sample_app
 
 2. 编辑gemfile
 
