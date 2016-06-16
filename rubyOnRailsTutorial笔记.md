@@ -5933,4 +5933,354 @@ _代码清单11.63: 配置图片上传程序, 调整图片的尺寸 app/uploader
 
 略
 
-# 11.4 小结
+# 11.5 小结
+
+* 和用户一样, 微博也是一种资源, 而且有对应的ActiveRecord模型;
+* Rails支持多键索引;
+* 我们可以分别在用户和微博模型中使用has\_many和belongs\_to方法实现一个用户有多篇微博的模型;
+* has\_many/belongs\_to会创建喝多方法, 通过关联创建对象;
+* user.microposts.build(...)创建一个微博对象, 兵自动把这个微博和用户关联起来;
+* Rails支持使用default\_scope制定默认排序方式;
+* 作用域方法的参数是匿名函数;
+* 加入dependent: :destroy参数后, 删除对象时也回把关联的微博删除;
+* 分页和数量统计都可以通过关联调用, 这样写出的代码很简洁;
+* 在固件中可以创建关联;
+* 可以向Rails局部视图中传入变量;
+* 查询ActiveRecord模型时可以使用where方法;
+* 通过关联创建和销毁对象有安全保障;
+* 可以使用CarrierWave上传图片及调整图片尺寸.
+
+
+# 11.6 练习
+
+1. 重构首页视图, 把if-else语句两个分支分别放到单独的局部视图中.
+2. 为侧边栏中的微博数量编写测试(还要检查使用了正确的单复数形式).
+3. 为图片上传程序编写测试.
+
+# 12.1 关系模型
+
+## 12.1.1 数据模型带来的问题及解决方法
+
+首先需要明确的是我们要使用has\_many辅助方法. 可以肯定的是不能之间对关注的用户使用has\_many方法, 这样会造成逻辑的混乱. 如果把所有关注的用户copy到当前用户下建立一个following表, 为了能够使用has\_many提供的各种方法, 就需要把整个用户模型都copy过来, 数据库冗余太多. has\_many提供了一个through功能, 通过一个中间层,实现对另外一张表上的各种功能.
+
+用户在关注\取消关注另一个用户时, 实际上创建和销毁的是两个用户之间的"关系". 因此, 用户可以有多个关系, 而通过关系可以找到following和followers. 而这个关系实际上是一个中间层, 用来存储全局的关系, 要得到单个用户的followers\_id和following\_id需要查找这个关系库.
+同时, 需要注意的是, 微博的关注实际上是一种非对称的关系, A关注了B, B可以不关注A. 如果A关注了B, 而B没有关注A, 这种关系对于A来说的称为"主动关系", 对于B来说称为"被动关系".
+
+这个全局的关系表命名为relationship, 对应模型Relationship. 包含属性
+
+|relationship|
+|--|--|
+id|integer
+follower_id|integer
+followed_id|integer
+created_at|datetime
+updated_at|datetime
+
+首先生成模型
+
+    rails generate model Relationship follower_id:integer followed_id:integer
+
+为了查找更为快速, 建立索引
+
+_代码清单12.1: 在relationships表中添加索引 db/migrate/[timestamp]\_create\_relationships.rb_
+
+    class CreateRelationships < ActiveRecord::Migration
+      def change
+        create_table :relationships do |t|
+          t.integer :follower_id
+          t.integer :followed_id
+
+          t.timestamps null: false
+        end
+
+        add_index :relationships, :follower_id
+        add_index :relationships, :followed_id
+        add_index :relationships, [:follower_id, :followed_id], unique: true
+      end
+    end
+
+在上面的代码中还设置了一个"多键索引", 确保(follower\_id, followed\_id)组合是唯一的, 避免多次关注同一用户. 代码清单6.28中也有保持电子邮件地址唯一的索引. 在12.1.4中用户界面也会防止多次关注同一用户. 添加多键索引后, 如果用户视图创建重复关系就会跑出异常.
+
+执行迁移
+
+    bundle exec rake db:migrate
+
+## 12.1.2 用户和"关系"模型之间的关联
+
+和创建微博时一样, 我们要通过关联创建关系
+
+    user.active_relationships.build(followed_id: ...)
+
+在users和microposts的关联时使用:
+
+    class User < ActiveRecord::Base
+      has_many :micropost
+      ...
+    end
+
+    class Micropost < ActiveRecord::Base
+      belongs_to :user
+      ...
+    end
+
+这时rails会自动寻找关联, 首先使用classify方法把has\_many的参数转换为类名(例如"foo\_bars"会转换为"FooBar"), 默认情况下, rails会寻找名为<class>\_id的外键(<class>是类名的小写形式). 现在的情况是类名为Relationship, 而我们想写成`has_many :active_relationship`, 同时使用的外键为follower\_id.
+
+_代码清单12.2: 实现"主动关系"中的has\_many关联 app/models/user.rb_
+
+    class User < ActiveRecord::Base
+      has_many :microposts, dependent: :destroy
+      has_many :active_relationships, class_name: "Relationship", foreign_key: "follower_id", dependent: :destroy
+      ...
+    end
+
+_代码清单12.3: 在"关系"模型中添加belongs\_to关联 app/models/relationship.rb_
+
+    class Relationship < ActiveRecord::Base
+      belongs_to :follower, class_name: "User"
+      belongs_to :followed, class_name: "User"
+    end
+
+_表12.1: 用户和"主动关系"关联后得到的方法_
+
+方法|作用
+--|--
+active\_relationships.follower | 获取关注我的用户
+active\_relationships.followed | 获取我关注的用户
+user.active\_relationships.create(followed\_id: user.id) | 创建user发起的主动关系
+user.active\_relationships.create!(followed\_id: user.id) | 创建user发起的主动关系(失败时抛出异常)
+user.active\_relationships.build(followed\_id: user.id) | 构建user发起的主动关系对象
+
+
+## 12.1.3 数据验证
+
+在关系模型中添加一些验证.
+
+_代码清单12.4: 测试关系模型中的验证 test/models/relationshi\_test.rb_
+
+    require 'test_require'
+    class RelationshipTest < ActiveSupport::TestCase
+      def setup
+        @relationship = Relationship.new(follower_id: 1, followed: 2)
+      end
+
+      test "should be valid" do
+        assert @relationship.valid?
+      end
+
+      test "should require a follower_id" do
+        @relationship.follower_id = nil
+        assert_not @relationship.valid?
+      end
+
+      test "should require a followed_id" do
+        @relationship.followed_id = nil
+        assert_not @relationship.valid?
+      end
+    end
+
+_代码清单12.5: 在关系模型中添加验证 app/models/relationship.rb_
+
+    class Relationship < ActiveRecord::Base
+      belongs_to :follower, class_name: "User"
+      belongs_to :followed, class_name: "User"
+      validates :follower_id, presence: true
+      validates :followed_id, presence: true
+    end
+
+生成的关系固件违背了迁移(代码清单12.1)中的唯一性约束, 这一点和生成的用户固件(代码清单6.29)一样, 和以前一样(代码清单6.30)也需要删除自动生成的固件.
+
+_代码清单12.6: 删除"关系"固件 test/fixtures/relationshis.yml_
+
+    # empty
+
+_代码清单12.7: 测试 略_
+
+## 12.1.4 我关注的用户
+
+本节获取我关注的用户, 使用has\_many :through关联: 用户通过关系模型关注了多个用户. 默认情况下, 在has\_many :through关联中, Rails会寻找关联名单复数形式对应的外键. 例如, 在`has_many :followeds, through: :active_relationships`中, 关联名为followeds, Rails会自动变为单数形式followed, 会在relationship表中获取一个由followed\_id组成的集合. 但是写成user.followeds语法上有点说不通, 因此会使用user.following. 这就需要定制关联方法: 使用source参数指定following数组由followed\_id组成.
+
+_代码清单12.8: 在用户模型中添加following关联 app/models/user.rb_
+
+    class User < ActiveRecord::Base
+      has_many :microposts, dependent: :destroy
+      has_many :active_relationship, class_name: "Relationshi", foreign_key: "follower_id", dependent: :destroy
+      has_many :following, through: active_relationships, source: :followed
+      ...
+    end
+
+定义了关联后, 就可以利用ActiveRecord和数组的功能. 例如
+
+    user.following.include?(other_user)
+    user.following.find(other_user)
+
+很多情况下可以把following当成数组来用, Rails会使用特定的方式处理following, 所以`following.include?(other_user)`看起来好像先从数据库把所有我关注的用户从数据库中去除, 然后再调用include?, 其实Rails会直接在数据层执行相关操作.
+
+为了处理关注用户的操作, 我们还需要定义两个辅助方法: follow和unfollow. 还需要定义following?, 检查一个用户是否关注了另一个用户.
+
+先写一个测试: 调用following?方法确认某个用户没有关注另一个用户, 然后调用follow方法关注这个用户, 再用following?方法确认关注成功, 最后调用unfollow方法取消关注, 并再次确认.
+
+_代码清单12.9: 测试关注用户相关的几个辅助方法 test/models/user\_test.rb_
+
+    require 'test_helper'
+    class UserTest < ActiveSupport::TestCase
+      ...
+      test "should follow and unfollow a user" do
+        michael = users(:michael)
+        archer = users(:archer)
+        assert_not michael.following?(archer)
+        michael.follow(archer)
+        assert michael.following?(archer)
+        michael.unfollow(archer)
+        assert_not michael.following?(archer)
+      end
+    end
+
+上面测试中使用的follow, unfollow, following?方法还未定义
+
+_代码清单12.10: 定义关注用户相关的几个辅助方法 app/models/user.rb_
+
+    class User < ActiveRecord::Base
+      ...
+      def feed
+        ...
+      end
+
+      # 关注另一个用户
+      def follow(other_user)
+        active_relationships.create(followed_id: other_user.id)
+      end
+
+      # 取消关注另一个用户
+      def unfollow(other_user)
+        active_relationships.find_by(followed_id: other_user.id).destroy
+      end
+
+      # 如果当前用户关注了指定的用户, 返回true
+      def following?(other_user)
+        following.include?(other_user)
+      end
+
+      private
+        ...
+    end
+
+这下测试可以通过了
+
+_代码清单12.11: 测试 略_
+
+## 12.1.5 关注我的人
+
+本节定义passive\_relationships(也就是user.followers方法), 可以参照active\_relationships的实现方法.
+
+_代码清单12.12: 使用"被动关系"实现user.followers app/models/user.rb_
+
+    class User < ActiveRecord::Base
+      has_many :microposts, dependent: :destroy
+      has_many :avtive_relationships, class_name: "Relationship", foreign_key: "follower_id", dependent: :destroy
+      has_many :passive_relationships, class_name: "Relationship", foreign_key: "followed_id", dependent: :destroy
+      has_many :following, through: :active_relationships, sources: :followed
+      has_many :followers, through: :passive_relationships, sources: :follower
+      ...
+    end
+
+接下来测试这个模型
+
+_代码清单12.13: 测试followers关联 test/models/user\_test.rb_
+
+    require 'test_helper'
+    class UserTest < ActiveSupport::TestCase
+
+      ...
+
+      test "should follow and unfollow a user" do
+        michael = users(:michael)
+        archer = users(:archer)
+        assert_not michael.following?(archer)
+        michael.follow(archer)
+        assert michael.following?(archer)
+        assert archer.followers.include?(michael)
+        michael.unfollow(archer)
+        assert_not michael.following?(archer)
+        assert_not archer.followers.include?(michael)
+      end
+    end
+
+最后可以进行测试.
+
+# 12.2 关注用户的网页界面
+
+## 12.2.1 示例数据
+
+添加一些用户相互关注的关系, 第一个用户关注第3-51个用户, 让第4-41个用户关注第一个用户.
+
+_代码清单12.14: 在种子数据中添加关系相关的数据 db/seeds.rb_
+
+    # Users
+    User.create!(name: "Example User",
+                 email: "example@railstutorial.org",
+                 password: "foobar",
+                 password_confirmation: "foobar",
+                 admin: true,
+                 activated: true,
+                 activated_at: Time.zone.now)
+
+    99.times do |n|
+      name = Faker::Name.name
+      email = "example-#{n+1}@railstutorial.org"
+      password = "password"
+      User.create!(name: name,
+                   email: email,
+                   password: password,
+                   password_confirmation: password,
+                   activated: true,
+                   activated_at: Time.zone.now)
+    end
+
+    # Micropost
+    users = User.order(:created_at).take(6)
+    50.times do
+      content = Faker::Lorem.sentence(5)
+      users.each { |user| user.microposts.create!(content: content) }
+    end
+
+    # Following relationships
+    users = User.all
+    user = users.first
+    following = users[2..50]
+    followers = users[3..40]
+    following.each { |followed| user.follow(followed) }
+    followers.each { |follower| follower.follow(user) }
+
+之后可以执行迁移
+
+    bundle exec rake db:migrate:reset
+    bundle exec rake db:seed
+
+# 12.2.2 数量统计和关注表单
+
+在资料页面显示我关注的人和关注我的人的数量, 分配链接到专门的用户列表, 然后添加关注和取消关注的表单.
+
+先创建路由
+
+_代码清单12.15: 在用户控制器中添加following和followers两个动作 config/routes.rb_
+
+    Rails.application.routes.draw do
+      root 'stativ_pages#home'
+      get 'help' => 'static_pages#help'
+      get 'about' => 'static_pages#about'
+      get 'contact' => 'static_pages#contact'
+      get 'signup' => 'users#new'
+      get 'login' => 'sessions#new'
+      post 'login' => 'session#create'
+      delete 'logout' => 'session#destroy'
+      resources :users do
+        member do
+          get :following, :followers
+        end
+      end
+      resources :account_activations, only: [:edit]
+      resources :password_resets, only: [:new, :create, :edit, :update]
+      resrouces :microposts, only: [:create, :destroy]
+    end
+
+member方法创建的地址会包含用户ID, 还可以用collection方法, URL中就没有ID.
