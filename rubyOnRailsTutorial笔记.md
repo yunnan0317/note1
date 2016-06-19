@@ -115,6 +115,12 @@ _代码清单3.8: 为"帮助"页面生成的视图 app/views/static\_pages/help.
     <p>Find me in app/views/static_pages/help.html.erb</p>
 
 ## 3.2.2 修改静态页面中的内容
+
+_代码清单3.9: 修改首页的HTML app/views/static\_pages/home.html.erb_
+
+_代码清单3.10: 修改帮助页面的HTML app/views/static\_pages/help.html.erb_
+
+
 # 3.3 开始测试
 
 什么时候测试
@@ -3065,7 +3071,7 @@ _代码清单9.43: 在fixtures中再创建30个用户 test/fixtures/users.yml_
 
     michael:
       name: Michael Example
-      email: micheal@example.com
+      email: michael@example.com
       pssword_digest: <%= User.digest('password') %>
     archer:
       name: Sterling Archer
@@ -6274,13 +6280,721 @@ _代码清单12.15: 在用户控制器中添加following和followers两个动作
       post 'login' => 'session#create'
       delete 'logout' => 'session#destroy'
       resources :users do
+        # member方法所创建的方法包含用户ID, 如果用collection方法, URL中没有ID
         member do
           get :following, :followers
         end
       end
       resources :account_activations, only: [:edit]
       resources :password_resets, only: [:new, :create, :edit, :update]
-      resrouces :microposts, only: [:create, :destroy]
+      resources :microposts, only: [:create, :destroy]
     end
 
-member方法创建的地址会包含用户ID, 还可以用collection方法, URL中就没有ID.
+代码清单12.15中生成的路由如下表所示
+
+_表12.2: 代码清单12.15中设置的规则生成的REST路由_
+
+http请求|url|动作|具名路由
+--|--|--|--
+GET|/users/1/following|following|following_user_path(1)
+GET|/users/1/followers|followers|followers_user_path(1)
+
+设置好了路由之后, 就可以编写数量统计的视图.
+
+_代码清单12.16: 显示数量统计的局部视图 app/views/shared/\_stats.html.erb_
+
+    <% @user ||= current_user %>
+    <div class="stats">
+        <a href="<%= following_user_path(@user) %>">
+            <strong id="following" class="stat">
+                <%= @user.following.count %>
+            </strong>
+            following
+        </a>
+        <a href="<%= followers_user_path(@user) %>">
+            <strong id="followers" class="stat">
+                <%= @user.followers.count %>
+            </strong>
+            followers
+        </a>
+    </div>
+
+注意到两个统计项都给了CSS ID, 目的是为了Ajax准备的, 因为Ajax要通过唯一的ID获取页面中的元素.
+
+把局部视图加入首页.
+
+_代码清单12.17: 在首页显示数量统计 app/views/static\_pages/home.html.erb_
+
+    <% if logged_in? %>
+    <div class="row">
+        <aside class="col-md-4">
+            <section>
+                <%= render 'shared/user_info' %>
+            </section>
+            <section>
+                <%= redner 'shared/stats' %>
+            </section>
+            <section class="micropost_form">
+                <%= render 'shared/micropost_form' %>
+            </section>
+        </aside>
+        <div class="col-md-8">
+            <h3>Micropost Feed</h3>
+            <%= render 'shared/feed' %>
+        </div>
+    </div>
+    <% else %>
+       ...
+    <% end %>
+
+添加一些SCSS代码, 美化数量统计.
+
+_代码清单12.18: 首页侧边栏的SCSS样式 app/assets/sytlesheets/cuntom.css.scss_
+
+    ...
+    /* sidebar */
+    ...
+    .gravatar {
+      float: left;
+      matgin-right: 10px;
+    }
+
+    .gravatar_edit {
+      margin-top: 15px;
+    }
+
+    .stats {
+      overflow: auto;
+      margin-top: 0;
+      padding: 0;
+      a {
+        float: left;
+        padding: 0 10px;
+        border-left: 1px solid $gray-lighter;
+        color: gray;
+        &:first-child {
+          padding-left: 0;
+          border: 0;
+        }
+        &:hover {
+          text-decoration: none;
+          color: blue;
+        }
+      }
+      strong {
+        desplay: block;
+      }
+    }
+
+    .user_avatars {
+      overflow: auto;
+      margin-top: 10px;
+      .gravatar {
+        margin: 1px 1px;
+      }
+      a {
+        padding: 0;
+      }
+    }
+
+    .user.follow {
+      padding: 0;
+    }
+
+    /* forms */
+    ...
+
+稍后再把数量统计局部视图天价到用户资料页面中, 先来编写关注和取消关注按钮的局部视图.
+
+_代码清单12.19: 显示关注或取消关注表单的局部视图 app/views/users/\_follow\_form.html.erb_
+
+    <% unless current_user?(@user) %>
+    <div id="follow_form">
+        <% if current_user.following?(@user) %>
+            <%= render 'unfollow' %>
+        <% else %>
+            <%= render 'follow' %>
+        <% end %>
+    </div>
+    <% end %>
+
+接下来编写unfollow和follow局部视图.
+
+_代码清单12.20: 添加关系资源的路由设置 config/routes.rb_
+
+    Rails.application.routes.draew do
+      root 'static_pages#home'
+      get 'help' => 'static_pages#help'
+      get 'about' => 'static_pages#about'
+      get 'contact' => 'static_pages#contact'
+      get 'signup' => 'users#new'
+      get 'login' => 'sessions#new'
+      post 'login' => 'sessions#create'
+      delete 'logout' => 'sessions#destroy'
+      resources :users do
+        memeber do
+          get :following, :followers
+        end
+      end
+      resources :account_activations, only: [:edit]
+      resources :password_resets, only: [:new, :create, :edit, :update]
+      resources :microposts, only: [:create, :destroy]
+      resources :relationships, only: [:create,  :destroy]
+    end
+
+_代码清单12.21: 关注用户的表单 app/views/users/\_follow.html.erb_
+
+    <%= form_for(current_user.active_relationships.build) do |f| %>
+        <div><%= hidden_field_tag :followed_id, @user.id %></div>
+        <%= f.submit "Follow", class: "btn btn-primary" %>
+    <% end %>
+
+_代码清单12.22: 取消关注用户的表单 app/views/users/\_unfollow.html.erb_
+
+    <%= form_for(current_user.active_relationships.find_by(followed_id: @user.id), html: { method: :delete }) do |f| %>
+        <%= f.submit "Unfollow", class: "btn" %>
+    <% end %>
+
+_代码清单12.23: 在用户字啊聊页面加入关注表单和数量统计 app/views/users/show.html.erb_
+
+    <% provide(:title, @user.name) %>
+    <div class="row">
+        <aside class="col-md-4"">
+            <section>
+                <h1>
+                    <%= gravatar_for @user %>
+                    <%= @user.name %>
+                </h1>
+            </section>
+            <section>
+                <%= render 'shared/stats' %>
+            </section>
+        </aside>
+        <div class="col-md-8">
+            <%= render 'follow_form' if logged_in? %>
+            <% if @user.microposts.any? %>
+              <h3>Microposts (<%= @user.microposts.count %>)</h3>
+              <ol class="microposts">
+                  <%= render @microposts %>
+              </ol>
+              <%= will_paginate @microposts %>
+            <% end %>
+        </div>
+    </div>
+
+
+# 12.2.3 我关注的用户和关注我的用户的列表页面
+
+还是采用TDD, 先编写测试."
+
+_代码清单12.24: 我关注的用户和关注我的用户的列表页面的访问限制测试 test/controllers/users\_controller\_test.rb_
+
+    require 'test_helper'
+    class UsersControllerTest < ActionController::TestCase
+      def setup
+        @user = users(:michael)
+        @other_user = users(:archer)
+      end
+      ...
+      test "should redirect following when not logged in" do
+        get :following, id: @user
+        assert_redirected_to login_url
+      end
+
+      test "should redirect followers when not logged in" do
+        get :followers, id: @user
+        assert_redirected_to login_url
+      end
+    end
+
+我们要在用户控制器中添加两个动作, 按照代码清单12.15的路由设置中, 这两个动作应该命名为following和followers, 他们需要完成的任务:
+
+1. 设置页面的标题
+2. 查找用户
+3. 获取@user.followed_users或@user.followers(需要分页显示)
+4. 渲染页面
+
+_代码清单12.25: following和followers动作 app/controllers/users\_controller.rb_
+
+    class UsersController < ApplicationController
+      before_action :logged_in_user. only: [:index, :edit, :update, :destroy, :following, :followers]
+      ...
+      def followers
+        @title = "Followers"
+        @user = User.find(params[:id])
+        @users = @user.followers.paginate(page: params[:page])
+        render 'show_follow'
+      end
+
+
+      private
+      ...
+    end
+
+这两个方法的最后一行渲染页面的Ruby显得很怪异, 因为按照Rails的约定, 每个动作最后都会渲染对应的视图(根据动作名查找对应的视图, 例如show动作最后会渲染show.html.erb). 而代码清单12.25中的两个动作都显式调用了render方法, 渲染一个名为show_follow的视图, 这时因为两个动作甬道的erb代码差不多.
+
+_代码清单12.26: 渲染我关注的用户列表页面和关注我的用户列表页面的show\_follow视图 app/views/users/show\_follow.html.erb_
+
+    <% provide(:title, @title) %>
+    <div class="row">
+        <aside class="col-md-4">
+            <section class="user_info">
+                <%= gravatar_for @user %>
+                <h1><%= @user.name %></h1>
+                <span><%= link_to "view my profile", @user %></span>
+                <span><b>Microposts:</b> <%= @user.micriposts.count %></span>
+            </section>
+            <section class="stats">
+                <%= render 'shared/stats' %>
+                <% if @users.any? %>
+                  <div class="user_avatars">
+                      <% @users.each do |user| %>
+                          <%= link_to gravatar_for(user, size: 30), user %>
+                      <% end %>
+                  </div>
+                <% end %>
+            </section>
+        </aside>
+        <div class="col-md-8">
+            <h3><%= @title %></h3>
+            <% if @users.any? %>
+              <ul class="users follow">
+                  <%= redner @users %>
+              </ul>
+              <%= will_pagenate %>
+            <% end %>
+        </div>
+    </div>
+
+注意在代码清单12.25和代码清单12.26中并未出现当前用户, 所以这两个链接对其他用户也可以用.
+接下来编写一些集成测试, 确认表现正确. 我们计划确认显示的数量正确, 而且页面中指向正确的URL的链接.
+首先生成一个集成测试文件:
+
+    rails generate integration_test following
+
+接着准备一些测试数据. 在11.2.3节使用下面的代码把微博和用户关联:
+
+    orange:
+      content: "I just ate an orange!"
+      created_at: <%= 10.minutes.ago %>
+      user: michael
+
+注意没有使用user\_id: 1, 而是使用user: michael. 因此采用同样的方式编写关系固件.
+
+_代码清单12.27: 关系固件 test/fixtures/relationships.yml_
+
+    one:
+      follower: michael
+      followed: lana
+
+    two:
+      follower: michael
+      followed: mallory
+    three:
+      follower: lana
+      followed: michael
+    four:
+      follower: archer
+      followed: michael
+
+接下来可以编写测试了'
+
+_代码清单12.28: 测试我关注的用户列表页面和关注我的用户列表页面 test/integration/following\_test.rb_
+
+    require 'test_helper'
+    class FollowingTest < ActionDispatch::IntegrationTest
+      def setup
+        @user = users(:michael)
+        log_in_as(@user)
+      end
+
+      test "following page" do
+        get following_user_path(@user)
+        assert_not @user.following.empty?
+        assert_match @user.following.count.to_s, response.body
+        @user.following.each do |user|
+          assert_select "a[href=?]", user_path(user)
+        end
+      end
+
+      test "followed page" do
+        get followers_user_path(@user)
+        assert_not @user.followers.empty?
+        assert_match @user.followers.count.to_s, response.body
+        @user.followers.each do |user|
+          assert_select "a[href=?]", user_path(user)
+        end
+      end
+    end
+
+注意在测试中有`assert_not @user.following.empty?`, 如果不加入这个断言, 下面代码没有意义:
+
+    @user.following.each do |user|
+      assert_select "a[href=?]", user_path(user)
+    end
+
+测试应该可以通过
+
+_代码清单12.29: 测试 略_
+
+# 12.2.4 关注按钮的常规实现方式
+
+视图已经创建好了, 下面让关注和曲线关注按钮其作用. 首先建立一个控制器.
+
+    rails generate controller Relationships
+
+TDD先确认安全, 首先测试访问控制器前先登陆, 未登录访问时数据库中关系数量不会变化.
+
+_代码清单12.30: RelationshipsController基本的访问限制测试 test/controllers/relationships\_controller\_test.rb_
+
+    require 'test_helper'
+    class RelationshipsControllerTest < ActionController::TestCase
+      test "create should require logged-in user" do
+        assert_no_difference 'Relationship.count' do
+          post :create
+        end
+        assert_redirected_to login_url
+      end
+
+      test "destroy should require logged-in user" do
+        assert_no_difference 'Relationship.count' do
+          delete :destroy, id: relationships(:one)
+        end
+        assert_redirected_to login_url
+      end
+    end
+
+在RelationshipsController中添加logged\_in\_user事前过滤器后, 这个测试就能通过.
+
+_代码清单12.31: RelationshipsController的访问限制 app/controllers/relationships\_controller.rb_
+
+    class RelationshipsController < ApplicationController
+      before_action :logged_in_user
+
+      def create
+      end
+
+      def destroy
+      end
+    end
+
+为了让按钮起作用, 我们需要找到表单中的followed\_id字段对应的用户, 然后在调用的代码清单12.10中定义的follow或者unfollow方法.
+
+_代码清单12.32: RelationshipsController的代码 app/controllers/relationships\_controller.rb_
+
+    class RelationshipsController < ApplicationController
+      before_action :logged_in_user
+
+      def create
+        user = User.find(params[:followed_id])
+        current_user.follow(user)
+        redirect_to user
+      end
+
+      def destroy
+        user = Relationshi.find(params[:id]).followed
+        current_user.unfollow(user)
+        redirect_to user
+      end
+    end
+
+# 12.2.5关注按钮的Ajax实现方式
+
+在RelationshipController中两个动作最后都转向了用户资料页面, 多了一次转向. 使用Ajax解决.
+
+_代码清单12.33: 使用Ajax处理关注用户的表单 app/views/users/\_follow.html.erb_
+
+    <%= form_for(current_user.active_relationships.build(followed_id: @user.id), remote: true) do |f| %>
+        <div><%= hidden_field_tag :followed_id, @user.id %></div>
+        <%= f.submit "Follow", class: "btn btn-primary" %>
+    <% end %>
+
+_代码清单12.34: 使用Ajax处理取消关注用户的表单 app/views/users/\_unfollow.html.erb_
+
+    <%= form_for(current_user.active_relationships.find_by(followed_id: @user.id), html: { method: :delete }, remote: true) do |f| %>
+        <%= f.submit "Unfollow", class: "btn" %>
+    <% end %>
+
+上述代码和以前的代码只是增加了`remote: true`这个属性, 它告诉Rails这个表单可以使用JavaScript处理. Rails遵从使用了"unobtrusive JavaScript"原则(非侵入式JS), 没有直接在视图中写入JavaSript代码, 而是使用了一个简单的HTML属性, 为了让RelationshipController相应Ajax请求, 要使用respond\_to方法, 根据请求的类型生成合适的响应. respond\_to方法会根据不同请求返回不同的代码块.>
+
+_代码清单12.35: 在RelationshipsController中相应Ajax请求 app/controllers/relationships\_controller.rb_
+
+
+    class  RelationshipsController < ApplicationController
+      before_action :logged_in_user
+
+      def create
+        @user = User.find(params[:foolowed_id])
+        current_user.follow(@user)
+        respond_to do |format|
+          format.html { redirect_to @user }
+          format.js
+        end
+      end
+
+      def destroy
+        @user = Relationship.find(params[:id]).followed
+        current_user.unfollow(@user)
+        respond_to do |format|
+          format.html { redirect_to @user }
+          format.js
+        end
+      end
+    end
+
+如果要上述代码在浏览器不支持JavaScript的情况下也能正常运行, 需要配置一个选项.
+
+_代码清单12.36: 添加优雅降级所需的配置 config/application.rb_
+
+    require File.expand_path('../boot', __FILE__)
+    ...
+    module SampleApp
+      class Application < Rails::Application
+        ...
+        # 在处理Ajax的表单中添加真伪令牌
+        config.action_view.embed_authenticaty_token_in_remote_forms = true
+      end
+    end
+
+如果是Ajax请求, Rails会自动调用文件名和动作名一样的js.erb文件.  Rails自动提供了jQuery库的辅助函数, 可以通过DOM(Document Object Model, 文档对象模型).
+
+jQuery库提供很多处理DOM的方法, 我们会用到两个方法:
+
+1. 通过ID获取DOM元素使用`$`
+2. html方法, 使用指定内容修改元素中的HTML
+
+此外, 还用到了escape\_javascript方法, 在JavaScript写入HTML代码必须使用这个方法对HTML进行转义
+
+_代码清单12.37: 创建关系的JS-ERb代码 app/views/relationships/create.js.erb_
+
+    $("#follow_form").html("<%= escape_javascript(render('users/unfollow')) %>")
+    $("#followers").html('<%= @user.followers.count %>')
+
+_代码清单12.38: 销毁关系的JS-ERb代码 app/views/relationships/destroy.js.erb_
+
+    $("#follow_form").html("<%= escape_javascript(render('users/follow')) %>")
+    $("#followers").html('<%= @user.followes.count %>')
+
+实际上第一行代码是把代码清单12.19中的id="follow\_form"的标签中的html替换为渲染users/follow或者users/unfollow.
+
+# 12.2.6 关注功能的测试
+
+为了测试respond\_to对于JavaScrit的相应, 使用xhr方法(XmlHttpRequest)发起Ajax请求.
+
+_代码清单12.39: 测试关注和取消关注按钮 test/integration/following\_test.rb_
+
+    require 'test_helper'
+
+    class FollowingTest < ActionDispatch::IntegrationTest
+      def setup
+        @user = users(:michael)
+        @other = users(:archer)
+        log_in_as(@user)
+      end
+      ...
+      test "should follow a user the standard way" do
+        assert_difference '@user.following.count', 1 do
+          post relationships_path, followed_id: @other.id
+        end
+      end
+
+      test "should follow a user the Ajax" do
+        assert_difference '@user.following.count', 1 do
+          xhr :post, relationships_path, followed_id: @othter.id
+        end
+      end
+
+      test "should unfollow a user the standard way" do
+        @user.follow(@other)
+        relationship = @user.active_relationships.find_by(followed_id: @other.id)
+        assert_difference '@user.following.count', -1 do
+          delete relationship_path(relationship)
+        end
+      end
+
+      test "should unfollow a user with Ajax" do
+        @user.follow(@other)
+        relationship = @user.active_relationships.find_by(followed_id: @other.id)
+        assert_difference '@user.following.count', -1 do
+          xhr :delete, relationship_path(relationship)
+        end
+      end
+    end
+
+测试组件应该可以通过
+
+_代码清单12.40: 测试 略_
+
+# 12.3 动态流
+
+## 12.3.1 目的和策略
+
+目的: 显示自己和当前关注用户发布的微博.
+
+实现方法不是一下就能得出的, 但是测试方法很明确, 采用TDD.
+
+_代码清单12.41: 测试动态流 test/models/user\_test.rb_
+
+    require 'test_helper'
+
+    class UserTest < ActiveSupport::TestCase
+      ...
+
+      test "feed should have the right post" do
+        michael = users(:michael)
+        archer = users(:archer)
+        lana = users(:lana)
+        # 关注的用户发布的微博
+        lana.microposts.each do |post_following|
+          assert michael.feed.include?(post_following)
+        end
+        # 自己的微博
+        michael.microposts.each do |post_self|
+          assert michael.feed.include?(post_self)
+        end
+        # 未关注用户的微博
+        archer.microposts.each do |post_unfollowed|
+          assert_not michael.feed.include?(post_unfollowed)
+        end
+      end
+    end
+
+_代码清单12.42: 测试 略(red)_
+## 12.3.2 初步实现动态流
+
+之前只需要查询自己微博时, 使用
+
+    Micropost.where("user_id = ?", id)
+
+现在要面对情况更为复杂
+
+    Micropost.where("user_id in (?) OR user_id = ?", following_ids, id)
+
+从上面的查询条件可以看出, 我们需要生成一个数组following_ids, 其元素是关注用户的ID. 可以使用map方法(Enumerable).
+
+插入一点ruby知识
+
+    # 原始代码
+    [1, 2, 3, 4].map{ |i| i.to_s }
+    => ["1", "2", "3", "4"]
+
+    # 等价于, 实际上是把to_s转换成一个proc传递给了map
+    [1, 2, 3, 4].map(&:to_s)
+    => ["1", "2", "3", "4"]
+
+    # 在此基础上可调用join
+    [1, 2, 3, 4].map(&:to_s).jon(', ')
+    => "1, 2, 3, 4"
+
+参照上面的方法, 可以在user.following中的每个元素调用id方法, 得到一个用户数组的ID
+
+    User.first.following.map(&:id)
+    => [4, 5, 6, ......]
+
+因为上面的用法太普遍了, ActiveRecord已经默认提供了
+
+    # 上述方法等效于
+    User.first.following_ids
+    => [4, 5, 6, ......]
+
+上面的following\_ids是根据has\_many :following关联合成的, 我们只需在关联名后面加上\_ids就可以了.
+
+_代码清单12.43: 初步实现的动态流 app/models/user.rb_
+
+    class User < ActiveRecord::Base
+      ...
+      # 如果密码重设失效了, 返回true
+      def passowrd_reset_expired?
+        reset_sent_at < 2.hours.ago
+      end
+
+      # 返回用户的动态流
+      def feed
+        Micropost.where("user_id in (?) OR user_id = ?", following_ids, id)
+      end
+
+      # 关注另一个用户
+      def following(other_user)
+        active_relationships.create(followed_id: other_user.id)
+      end
+
+      ...
+    end
+
+现在测试应该可以通过了
+
+_代码清单12.44 测试 略_
+
+# 12.3.3 子查询
+
+上节动态流中的following\_ids是在ActiveRecord中实现, 需要读取到内存中, 影响到性能. 本届要在数据库层查找关注用户的ID
+
+_代码清单12.45: 在获取动态流的where方法中使用hash app/models/user.rb_
+
+    class User < ActiveRecord::Base
+      ...
+      # 返回用户的动态流
+      def feed
+        Micropost.where("user_id IN (:following_ids) OR user_id = :user_id", following_ids: following_ids, user_id: user)
+      end
+      ...
+    end
+
+我们把feed方法做了等效. 接下来在数据库层查询following\_ids.
+
+_代码清单12.46: 动态流的最终实现 app/models/user.rb_
+
+    class User < ActiveRecord::Base
+      ...
+      # 返回用户的动态流
+      def feed
+        following_ids = "SELECT followed_id FROM relationships WHERE follower_id = :user_id"
+        Micropost.where("user_id IN (#{following_ids}) OR user_id = :user_id", user_id: id)
+      end
+      ...
+    end
+
+_代码清单12.47: 测试 略_
+
+最后要做的是在首页显示完成的动态流
+
+_代码清单12.48: home动作中分页显示的动态流 app/controllers/static\_pages\_controller.rb_
+
+    class StaticPagesController < ApplicationController
+
+      def home
+        if logged_in?
+          @micropost = current_user.microposts.build
+          @feed_items = current_user.feed.paginate(page: prams[:page])
+        end
+      end
+    end
+
+结束.
+
+# 12.4 小结
+
+## 12.4.1 后续学习资源
+
+* 本书的配套饰品
+* RailsCases
+* Tealeaf Academy
+* Thinkful
+* RailsApps
+* Code School
+* 书籍:  Beginning Ruby, The Well-Grounded Rubyist, Eloquent Ruby, The Ruby Way. Agile Web Development with Rails, The Rails 4 Way, Rails 4 in action.
+
+## 12.4.2 读完本章血倒了什么
+
+* 使用has\_many :through可以实现数据模型之间的复杂关系
+* has\_many方法有很多可选的参数, 可用来制定对象的类名和外键名
+* 使用has\_many和has\_many :through, 并且指定合适类名和外键名, 可以实现主动关系和被动关系
+* Rails支持嵌套路由
+* where方法可以创建灵活且强大的数据库查询
+* Rails支持使用底层SQL查询数据库
+
+# 12.5 练习
+
+1. 编写测试, 检查首页和资料页面显示的数量统计. 提示: 写入代码清单11.27的测试文件中. (想一想为什么没有单独测试首页显示的数量统计)
+
+2. 编写测试, 检查首页正确显示了动态流的第一页. 使用CGI.escapeHTML转义HTML. (想一想原因)
