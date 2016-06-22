@@ -143,50 +143,98 @@ _代码清单3.10: 修改帮助页面的HTML app/views/static\_pages/help.html.e
 
 rails在生成控制器的时候就已经生成了一个测试, 可以从这个测试出发.
 
+_代码清单3.11: 为静态页面控制器生成的测试 test/controllers/static\_pages\_controller\_test.rb_
+
+    require 'test\_helper'
+    class StaticPagesControllerTest < ActionController::TestCase
+      test "should get home" do
+        get :home
+        assert_reponse :success
+      end
+
+      test "should get help" do
+        get :help
+        assert_reponse :success
+      end
+    end
+
+_代码清单3.12: 测试 略_
+
 ## 3.3.2 遇红
 
 TDD流程是先编写一个失败测试, 通过修改代码使测试通过, 按需重构. 也就是"遇红 => 变绿 => 重构"的循环.
 
 在控制器测试中加入如下代码
 
+_代码清单3.13: about页面的测试 test/controllers/static\_pages\_test.rb_
+
     require 'test_helper'
     class StaticPagesControllerTest < ActionController::TestCase
-      ...
+
+      test "should get home" do
+        get :home
+        assert_reponse :success
+      end
+
+      test "should get help" do
+        get :help
+        assert_reponse :success
+      end
+
       test "should get about" do
         get :about
         assert_response :success
       end
     end
 
-由于没有生成about页面的控制器, 因此这个测试会失败(遇红).
+    由于没有生成about页面的控制器, 因此这个测试会失败(遇红).
+
+_代码清单3.14: 测试 略_
 
 ## 3.3.3 变绿
 
 上节中失败测试的错误消息:
 
+_代码清单3.15: 测试错误消息_
+
+    $ bundle exec rake test
     ActionController::UrlGenerationError:
     No route matches {:action=>"about", :controller=>"static_pages"}
 
 可见是缺少路由规则. 添加一个路由规则
 
+_代码清单3.16: 添加about路由 config/routes.rb_
+
     Rails.application.routes.draw do
-      ...
+      get 'static_pages/home'
+      get 'static_pages/help'
       get 'static_pages/about'
       ...
     end
 
 继续测试, 仍无法通过, 不过错误消息变了.
 
+_代码清单3.17: 测试错误消息(二)_
+
+    $bundle exec rake test
     AbstractController::ActionNotFound:
     The action 'about' could not be found for StaticPagesController
+
+_代码清单3.18: 在静态控制器页面中添加about动作 app/controllers/static\_pages\_controller.rb_
 
 显然是控制器中缺少about动作, 在控制器中编写这个动作.
 
     class StaticPagesController < ApplicationController
-      ...
+
+      def home
+      end
+
+      def hlep
+      end
+
       def about
       end
-      ...
+
     end
 
 测试依然失败, 不过消息又变了.
@@ -196,15 +244,40 @@ TDD流程是先编写一个失败测试, 通过修改代码使测试通过, 按�
 
 这时由于缺少模板(视图)引起的, 新建一个视图, 保存在app/views/static_pages, 命名为about.html.erb
 
-运行测试, 通过.
+_代码清单3.19: about页面的内容 app/views/static\_pages/about.html.erb_
+
+    <h1>About</h1>
+    <p>
+        The <a href="http://www.railstutorial.org/"><em>Ruby on Rails
+        Tutorial</em></a> is a
+        <a href="http://www.railstutorial.org/book">book</a> and
+        <a href="http://screencasts.railstutorial.org/">screencast series</a>
+        to teach web develop with
+        <a href="http://rubyonrails.org/">Ruby on Rails</a>.
+        This is the sample application for the tutorial.
+    </p>
+
+运行测试, 应该可以通过.
+
+_代码清单3.20: 测试 略_
 
 ## 3.3.4 重构
 
 # 3.4 有点动态的页面
 
+根据所在页面不同, 显示不同标题, 采用TDD.
+
+_表3.2: 演示应用中基本上是静态内容的页面_
+
+页面|URL|基本标题|变动部分
+--|--|--|--
+首页|/static\_pages/home|"Ruby on Rails Tutorial Sample App"|"Home"
+帮助|/static\_pages/help|"Ruby on Rails Tutorial Sample App"|"Help"
+关于|/static\_pages/about||"About"
+
 ## 3.4.1 测试标题(遇红)
 
-一般网页的HTML结构
+_代码清单3.21: 一般网页的HTML结构_
 
     <!DOCTYPE html>
     <html>
@@ -216,7 +289,9 @@ TDD流程是先编写一个失败测试, 通过修改代码使测试通过, 按�
       </body>
     </html>
 
-在static_pages_controller_test中进行标题测试(遇红)
+在static\_pages\_controller\_test中进行标题测试(遇红)
+
+_代码清单3.22: 加入标题测试后的今天页面控制器测试 test/controllers/static\_pages\_controller\_test.rb_
 
     require 'test_helper'
     class StaticPagesControllerTest < ActionController::TestCase
@@ -234,9 +309,13 @@ TDD流程是先编写一个失败测试, 通过修改代码使测试通过, 按�
        end
     end
 
+_代码清单3.23: 测试 略_
+
 ## 3.4.2 添加页面标题(变绿)
 
 以home页面为例,help和about界面也是同样的.
+
+_代码清单3.24: 具有完整HTML结构的Home页面 app/views/static\_pages/home.html.erb_
 
     <!DOCTYPE html>
     <html>
@@ -251,6 +330,11 @@ TDD流程是先编写一个失败测试, 通过修改代码使测试通过, 按�
       </body>
     </html>
 
+_代码清单3.25: 具有完整HTML结构的Help页面 app/views/static\_pages/help.html.erb_
+
+_代码清单3.26: 具有完整HTML结构的About页面 app/views/static\_pages/about.html.erb_
+
+_代码清单3.27: 测试 略_
 
 ## 3.4.3 布局和嵌入式Ruby(重构)
 
@@ -259,6 +343,10 @@ TDD流程是先编写一个失败测试, 通过修改代码使测试通过, 按�
 2. 整个HTML结构在每个页面都重复地出现了.
 
 以home页面为例, 其他页面也相似.
+
+常用方法provide, 接受一个名称和内容, 把这个内容记录下来. 在视图中使用, yield方法(需要传入名称)调用.
+
+_代码清单3.28: 标题中使用erb的Home视图 app/views/static\_pages/home.html.erb_
 
     <% provide(:title, "Home") %>
     <!DOCTYPE html>
@@ -272,7 +360,15 @@ TDD流程是先编写一个失败测试, 通过修改代码使测试通过, 按�
       </body>
     </html>
 
-抽出相同结构构成模板.
+_代码清单3.29: 测试 略_
+
+_代码清单3.30: 标题中使用erb的Help视图 app/views/static\_pages/help.html.erb_
+
+_代码清单3.31: 标题中使用erb的About视图 app/views/static\_pages/about.html.erb_
+
+抽出相同结构构成模板, 写入布局文件. layout可以和其他view通过provide相互传递常量, 无参数的yield方法表示把每个页面的内容插入布局中.
+
+_代码清单3.32: 演示应用的网站布局 app/vies/layouts/application.html.erb_
 
     <!DOCTYPE html>
     <html>
@@ -291,13 +387,23 @@ stylesheet\_link\_tag用于引入样式表, 而javascript\_include\_tag用于引
 
 相应的, 页面文件中不需要完整的HTML结构, 做出相应调整(仍以Home页面为例).
 
+_代码清单3.33: 去除完成的HTML结构后的首页 app/views/static\_pages/home.html.erb_
+
     <% provide(:title, "Home") %>
     <h1>Sample App</h1>
     <p>This is the home pages for the <a href="http://www.railstutorial.org/">Ruby on Rails Tutorial</a> sample application.</p>
 
+_代码清单3.34: 去除完成的HTML结构后的Help页面 app/views/static\_pages/help.html.erb_
+
+_代码清单3.35: 去除完成的HTML结构后的About页面 app/views/static\_pages/about.html.erb_
+
+_代码清单3.36: 测试 略_
+
 ## 3.4.4 设置根路由
 
 将home设置为根路由
+
+_代码清单3.37: 把根路由指向Home config/routes.rb_
 
     Rails.applicationController.routes.draw do
       root 'static_pages#home'
@@ -306,17 +412,33 @@ stylesheet\_link\_tag用于引入样式表, 而javascript\_include\_tag用于引
     end
 
 # 3.5 小结
+
+* 使用provide方法可以定义常量,(需要传入名称与值), 调用时使用yield方法(需要传入名称)
+* provide方法可以在一般页面与布局页面传递
+* 布局中使用不带参数的yield方法表示把每个页面的内容插入布局中
+* 本章中的布局文件可以作为模板.
+* 在config/routes.rb文件中定义了新路由
+* Rails的视图中可以包含静态HTML及erb
+* Rails的布局定义页面公用的结构, 可以去除冗余
+
+
+
 # 3.6 练习
 
 1. 加入通用标题的控制器测试
 
+_代码清单3.38: 使用了通用标题的静态页面控制器测试 test/controllers/static\_pages\_controller\_test.rb_
+
         class StaticPagesControllerTest < ActionController::TestCase
+        # setup在每个测试运行前执行
           def setup
             @base_title = "Ruby on Rails Tutorial Sample App"
           end
-          testCase "should get home" do
+
+          test "should get home" do
             get :home
             assert_response :success
+            # #{@base_title}是字符串的差值, 只有在双引号中才能使用
             assert_select "title", "Help | #{@base_title}"
           end
           ...
@@ -324,7 +446,10 @@ stylesheet\_link\_tag用于引入样式表, 而javascript\_include\_tag用于引
 
 2. 新建联系页面
 
+_代码清单3.39: contact页面内容 略_
+
 # 3.7 高级测试技术
+
 
 # 4.1 导言, 第一个辅助方法
 
