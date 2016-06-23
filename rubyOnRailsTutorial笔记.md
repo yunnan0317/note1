@@ -415,13 +415,10 @@ _代码清单3.37: 把根路由指向Home config/routes.rb_
 
 * 使用provide方法可以定义常量,(需要传入名称与值), 调用时使用yield方法(需要传入名称)
 * provide方法可以在一般页面与布局页面传递
-* 布局中使用不带参数的yield方法表示把每个页面的内容插入布局中
-* 本章中的布局文件可以作为模板.
+* Rails的布局定义页面公用的结构, 可以去除冗余, 布局中使用不带参数的yield方法表示把每个页面的内容插入布局中
+* 本章中的布局文件可以作为模板
+* 需要记录Rails的一些撤销方法
 * 在config/routes.rb文件中定义了新路由
-* Rails的视图中可以包含静态HTML及erb
-* Rails的布局定义页面公用的结构, 可以去除冗余
-
-
 
 # 3.6 练习
 
@@ -453,9 +450,12 @@ _代码清单3.39: contact页面内容 略_
 
 # 4.1 导言, 第一个辅助方法
 
-app/helpers/application_helper.rb
+_代码清单4.1: 演示应用的网站布局 app/views/layouts/application.html.erb 与代码清单3.32相同_
+
+_代码清单4.2: 定义full\_title 方法 app/helpers/application\_helper.rb_
 
     module ApplicationHelper
+
       # 根据所在页面返回完整的标题
       def full_title(page_title = '')
         base_title = "Ruby on Rails Tutorial Sample App"
@@ -469,10 +469,78 @@ app/helpers/application_helper.rb
 
 这样的话需要简化布局.
 
-    <title><%= yield(:title) %> | Ruby on Rails Tutorial Sample App</title>
-改成
+_代码清单4.3: 使用full\_title辅助方法的网站布局 app/views/layouts/application.html.erb_
 
-    <title><%= full_title(yield(:title)) %></title>
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title><%= full_title(yield(:title)) %></title>
+            <%= stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track' => true %>
+            <%= javascript_include_tag 'application', 'data-turlinks-track' => true %>
+            <%= csrf_meta_tags %>
+        </head>
+        <body>
+            <%= yield %>
+        </body>
+    </html>
+
+同时, 我们可以在首页中删除首页的page\_title: Home, 这样在首页只显示base\_title.
+
+_代码清单4.3: 使用full\_title辅助方法的网站布局 app/views/layouts/application.html.erb_
+
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title><%= full_title(yield(:title)) %></title>
+            <%= stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track' => true %>
+            <%= javascript_include_tag 'application', 'data-turbolinks-track' => true %>
+            <%= csrf_meta_tags %>
+        </head>
+        <body>
+            <%= yield %>
+        </body>
+    </html>
+
+同样的需要对标题测试修改, 保证测试通过.
+
+_代码清单4.4: 修改首页的标题测试 test/controllers/static\_pages\_controllers\_test.rb_
+
+    require 'test_helper'
+
+    class StaticPagesControllerTest < ActionController::TestCase
+      test "should get home" do
+        get :home
+        assert_response :success
+        assert_select "title", "Ruby on Rails Tutorial Sample App"
+      end
+
+      test "should get help" do
+        get :help
+        assert_response :success
+        assert_select "title", "Help | Ruby on Rails Tutorial Sample App"
+      end
+
+      test "should get about" do
+        get :about
+        assert_response :success
+        assert_select "title", "About | Ruby on Rails Tutorial Sample App"
+      end
+    end
+
+运行测试, 无法通过, 因为还没有删除首页的Home.
+
+_代码清单4.5: 测试 RED_
+
+_代码清单4.6: 没定义页面标题的首页视图 app/views/static\_pages/home.html.erb_
+
+    <h1>Sample App</h1>
+    <p>
+        This is the home page for the <a href="http://www.railstutorial.org/">Ruby on Rails Tutorial</a> sample application.
+    </p>
+
+_代码清单4.7 测试 通过_
+
+
 
 # 5.1 添加一些结构
 # 5.1.1 网站导航
