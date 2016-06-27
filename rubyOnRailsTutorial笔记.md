@@ -610,27 +610,44 @@ _代码清单4.11: 引入CSS的代码生成的HTML_
       <script src="//sdnjs.cloudflare.com/ajax/libs/html5shiv/r29/html5.min.js"></script>
     <![endif]-->
 
-同时, 加入导航栏
+_代码清单5.1: 添加一些机构后的网站布局文件 app/views/layouts/application.html.erb_
 
-    <body>
-      <header class="navbar navbar-fixed-top navbar-inverse">
-        <div class="container">
-          <%= link_to "sample app", '#', id: "logo" %>
-          <nav>
-            <ul class="nav navbar-nav pull-right">
-              <li><%= link_to "Home", '#' %></li>
-              <li><%= link_to "Help", '#' %></li>
-              <li><%= link_to "Login", '#' %></li>
-            </ul>
-          </nav>
-        </div>
-      </header>
-      <div class="container">
-        <%= yield %>
-      </div>
-    </body>
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title><%= full_title(yield(:title)) %></title>
+            <%= stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track' => true %>
+            <%= javascript_include_tag 'application', 'data-turbolinks-track' =? true %>
+            <%= csrf_meta_tags %>
+            <!--[if lt IE 9]>
+                <script src="//cdnjs.clouflare.com/ajax/libs/html5shiv/r29/html5.min.js">
+                </script>
+            <![endif]-->
+        </head>
+        <body>
+            <header class="navbar navbar-fixed-top navbar-inverse">
+                <div class="contrainer"">
+                    <%= link_to "sample app", '#', id: "logo" %>
+                    <nav>
+                        <ul class="nav navbar-nav pull-right">
+                            <li><%= link_to "Home", '#' %></li>
+                            <li><%= link_to "Hlep", '#' %></li>
+                            <li><%= link_to "Log in", '#' %></li>
+                        </ul>
+                    </nav>
+                </div>
+            </header>
+            <div class="contrainer">
+                <%= yield %>
+            </div>
+        </body>
+    </html>
 
-在首页中加入按钮
+
+
+在首页中加入按钮, div标签的CSS类jumbotron在Bootstrap中有特殊的意义, 注册按钮的btn, btn-lg和btn-primary也是一样.
+
+_代码清单5.2: 首页视图, 包含一个到注册页面的链接 app/views/static\_pages/home.html.erb_
 
     <div class="center jumbotron">
       <h1>Welcome to the Sample App</h1>
@@ -643,9 +660,23 @@ _代码清单4.11: 引入CSS的代码生成的HTML_
 
 ## 5.1.2 引入Bootstrap和自定义的CSS
 
-将bootstrap-sass-3.2.0.0添加到gemfile中
+_代码清单5.3: 将bootstrap-sass-3.2.0.0添加到gemfile中_
 
-新建一个SCSS文件, 用custom.css.scss命名.
+    source 'https://rubygems.org'
+
+    gem 'rails', '4.2.0'
+    gem 'bootstrap-sass', '3.2.0.0'
+    ...
+
+在`app/assets/stylesheets/`新建一个SCSS文件, 用custom.css.scss命名.
+
+_代码清单5.4: 添加Bootstrap的CSS app/assets/stylesheets/custom.css.scss_
+
+_代码清单5.5: 添加全站使用的CSS app/assets/stylesheets/custom.css.scss_
+
+_代码清单5.6: 添加一些精美的文字排版样式 app/asserts/stylesheets/custom.css.scss_
+
+_代码清单5.7: 添加网站LOGO的样式 app/assets/stylesheets/custom.css.scss_
 
     @import "/bootstrap_home_path/bootstrap-sprockets";
     @import "/bootstrap_home_path/bootstrap";
@@ -728,6 +759,32 @@ _代码清单4.11: 引入CSS的代码生成的HTML_
         }
       }
     }
+
+
+## 5.1.3 局部视图
+
+为了简化layout, 可以考虑把保证IE兼容性的HTML shim和header部分的放到局部视图中
+
+_代码清单5.8: 把HTML shim和header部分的放到局部视图后的网站布局 app/views/layouts/application.html.erb_
+
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title><%= full_title(yield(:title)) %></title>
+            <%= stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track' => true %>
+            <%= javascript_include_tag 'application', 'data-turbolinks-track' =? true %>
+            <%= csrf_meta_tags %>
+            <%= render 'layouts/shim' %>
+        </head>
+        <body>
+            render 'layouts/header'
+            <div class="contrainer">
+                <%= yield %>
+            </div>
+        </body>
+    </html>
+
+
 
 # 5.3 布局中的链接
 
