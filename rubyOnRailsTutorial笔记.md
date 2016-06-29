@@ -785,6 +785,209 @@ _代码清单5.8: 把HTML shim和header部分的放到局部视图后的网站�
     </html>
 
 
+_代码清单5.9: HTML shim局部视图 app/views/layouts/\_shim.html.erb_
+
+    <!--[if lt IE 9]>
+        <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/r29/html5.min.js">
+        </script>
+    <![endif]-->
+
+
+_代码清单5.10: header的局部视图 app/views/layouts/\_header.html.erb_
+
+    <header class="navbar navbar-fixed-top navbar-inverse">
+        <div class="container">
+            <%= link_to "sample app", '#', id: "logo" %>
+            <nav>
+                <ul class="nav navbar-nav pull-right">
+                    <li><%= link_to "Home", '#' %></li>
+                    <li><%= link_to "Help", '#' %></li>
+                    <li><%= link_to "Log in", '#' %></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+_代码清单5.11: 网站底部的局部视图 app/views/layouts/\_footer.html.erb_
+
+    <footer class="footer">
+        <small>
+            The <a href="http://www.railstutorial.org/">Ruby On Rails Tutorial</a>
+            by <a href="http://www.michaelhartl.com/">Michael Hartl</a>
+        </small>
+        <nav>
+            <ul>
+                <li><%= link_to "About", '#' %></li>
+                <li><%= link_to "Contact", '#' %></li>
+                <li><a href="http://news.railstutorial.org">News</a></li>
+            </ul>
+        </nav>
+    </footer>
+
+_代码清单5.12: 添加底部局部视图后的网站布局 app/views/layouts/application.html.erb_
+
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title><%= full_title(yield(:title)) %></title>
+            <%= stylesheet_link_tag "application", media: "all", "data-turbolinks-track" => true %>
+            <%= javascript_include_tag "application", "data-turbolinks-track" => true %>
+            <%= csrf_meta_tags %>
+            <%= render 'layouts/shim' %>
+        </head>
+        <body>
+            <%= render 'layouts/header' %>
+            <div class="container">
+                <%= yield %>
+                <%= render 'layouts/footer' %>
+            </div>
+        </body>
+    </html>
+
+
+_代码清单5.13: 添加footer的CSS app/assets/stylesheets/custom.css.scss_
+
+    ...
+    /* footer */
+
+    footer {
+      margin-top: 45px;
+      padding-top: 5px;
+      border-top: 1px solid #eaeaea;
+      color: #777;
+    }
+
+    footer a {
+      color: #555;
+    }
+
+    footer a:hover {
+      color: #222;
+    }
+
+    footer small {
+      float: left;
+    }
+
+    footer ul {
+      float: right;
+      list-style: none;
+    }
+
+    footer ul li {
+      float: left;
+      margin-left: 15px;
+    }
+
+# 5.2 Sass和Aseet Pipeline
+
+# 5.2.1 Asset Pipeline
+
+# 5.2.2 Sass
+
+_代码清单5.15: 使用嵌套和变量改写后的SCSS文件 app/asserts/stylesheets/custom.css.scss_
+
+    @import "bootstrap-prockets";
+    @import "bootstrap";
+
+    /* mixins, variables, etc. */
+
+    $gray-medium-light: #eaeaea
+
+    /* universal */
+
+    html {
+      overflow-y: scroll;
+    }
+
+    body {
+      padding-top: 60px;
+    }
+
+    section {
+      overflow: auto;
+    }
+
+    textarea {
+      resize: vertical;
+    }
+
+    .center {
+      text-align: center;
+      h1 {
+        margin-bottom: 10px;
+      }
+    }
+
+    /* typrography */
+
+    h1, h2, h3, h4, h5, h6 {
+      line-height: 1;
+    }
+
+    h1 {
+      font-size: 3em;
+      letter-spacing: -2px;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    h2 {
+      font-size: 1.2em;
+      letter-spacing: -1px;
+      margin-bottom: 30px;
+      text-align: center;
+      font-weight: normal;
+      color: $gray-light;
+    }
+
+    p {
+      font-size: 1.1em;
+      line-weight: 1.7em;
+    }
+
+    /* header */
+
+    #logo {
+      float: left;
+      margin-right: 10px;
+      font-size: 1.7em;
+      color: white;
+      text-transform: uppercase;
+      letter-spacing: -1px;
+      padding-top: 9px;
+      font-weight: bold;
+      &:hover {
+        color: white;
+        text-decoration: none;
+      }
+    }
+
+    /* footer */
+
+    footer {
+      margin-top: 45px;
+      padding-top: 5px;
+      border-top: 1px solid $gray-medium-light;
+      color: $gray-medium-light;
+      a {
+        color: $gray;
+        &:hover {
+          color: $gray-darker
+        }
+      }
+      small {
+        float: left;
+      }
+      ul {
+        float: right;
+        list-style: none;
+        li {
+          float: left;
+          margin-left: 15px;
+        }
+      }
+    }
 
 # 5.3 布局中的链接
 
@@ -796,38 +999,165 @@ Rails习惯使用具名路由制定链接地址
 
     <%= link_to "About", about_path %>
 
+_表5.1 网站链接中的路由和URL地址之间的映射关系_
+
+页面|URL|具名路由
+--|--|--
+Home|/|root\_path
+About|/about|about\_path
+Help|/help|help\_path
+Contact|/contact|contact\_path
+Sign up|/signup|signup\_path
+Log in|/login|login\_path
+
+
 ## 5.3.1 Contact页面
+
+添加Contact页面, TDD. 首先编写测试."
+
+_代码清单5.16: Contact页面的测试 test/controllers/static\_pages\_controllers\_test.rb_
+
+    require 'test_helper'
+
+    class StaticPagesControllerTest < ActionController::TestCase
+
+      test "should get home" do
+        get :home
+        assert_reponse :success
+        assert_select "title", "Ruby on Rails Tutorial Sample App"
+      end
+
+      test "should get help" do
+        get :help
+        assert_reponse :success
+        assert_select "title", "Help | Ruby on Rails Tutorial Sample App"
+      end
+    end
+
+    test "should get about" do
+      get :about
+      assert_reponse :success
+      assert_select "title", "About | Ruby on Rails Tutorial Sample App"
+    end
+
+    test "should get contact" do
+      get :contact
+      assert_reponse :success
+      assert_select "title", "Contact | Ruby on Rails Tutorial Sample App"
+    end
+
+
+_代码清单5.17 测试 略 RED_
+
+根据错误提示, 建立Contact路由
+
+_代码清单5.18: 添加Contact页面的路由 config/routes.rb_
+
+
+    Rails.application.routes.draw do
+      root 'static_pages#home'
+      get 'static_pages/help'
+      get 'static_pages/about'
+      get 'static_pages/contact'
+    end
+
+_代码清单5.19: 添加Contact页面的动作 app/controllers/static\_pages\_controller.rb_
+
+    class StaticPagesController < ApplicationController
+      ...
+
+      def contact
+      end
+    end
+
+_代码清单5.20: Contact页面的视图 app/views/static_pages/contact.html.erb_
+
+    <% provide(:title, 'Contact') %>
+    <h1>Contact</h1>
+    <p>Contact the Ruby on Rails Tutorial about the sample app at the
+        <a href="http://www.railstutorial.org/#contact">contact page</a>.
+    </p>
+
+现在测试可以通过了.
+
+_代码清单5.21: 测试 略_
+
 ## 5.3.2 Rails路由
 
-对于根路由, 可以使用"控制器名称#动作名称"定义
+以根路由为例, 对于具名路由, 可以使用"控制器名称#动作名称"定义
 
     root 'static_pages#home'
+
+这样就创建了两个具名路由: root\_path和root\_url. 二者的区别是后者是, 后者是完整的URL中. 只有重定向需要使用\_url形式, 其他均使用\_path形式.
+
 
 同样的原理, 可以为每个页面定义具名路由
 
     get 'help' => 'static_pages#help'
 
+_代码清单5.22: 静态页面的路由 config/routes/rb_
+
+    Rails.application.routes.draw do
+      root 'static_pages#home'
+      get 'help' => 'static_pages#help'
+      get 'about' => 'static_pages#help'
+      get 'contact' => 'static_pages#contact'
+    end
+
 这样就可以在布局文件中使用具名路由.
 
 ## 5.3.3 使用具名路由
+
+_代码清单5.23: 在header中使用具名路由 app/views/layouts/\_header.html.erb_
+
+    <header class="navbar navbar-fixed-top navbar-inverse">
+        <div class="container">
+            <%= link_to "sample app", root_path, id: "log" %>
+            <nav>
+                <ul class="nav navbar-nav pull-right">
+                    <li><%= link_to "Home", root_path %></li>
+                    <li><%= link_to "Help", help_path %></li>
+                    <li><%= link_to "Log in", '#' %></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+_代码清单5.24: 在footer中使用具名路由 app/views/layouts/\_footer.html.erb_
+
+    <footer class="footer">
+        <small>
+            The <a href="http://www.railstutorial.org/">Ruby on Rails Tutorial</a>
+            by <a href="http://www.michelhartl.com/">Michael Hartl</a>
+        </small>
+        <nav>
+            <ul>
+                <li><%= link_to "About", about_path %></li>
+                <li><%= link_to "Contact", contact_path %></li>
+                <li><a href="http://news.railstutorial.org/"></a>News</li>
+            </ul>
+        </nav>
+    </footer>
 
 ## 5.3.4 布局中的链接测试(集成测试)
 
 1. 访问根路由(首页)
 2. 确认使用正确的模板渲染
-3. 检查指向首页, "帮助"页面, "关于"页面和"联系"页面的地址是否正确
+3. 检查指向首页, "帮助"页面, "关于"页面和"联系"页面的地址是否正确"
 
-        require 'test_helper'
-        class SiteLayoutTest < ActionDispatch::IntegrationTest
-          test "layout links" do
-            get root_path
-            asserttemplate 'static_pages/home'
-            assert_select "a[href=?]", root_path, count:2
-            assert_select "a[href=?]", help_path
-            assert_select "a[href=?]", about_path
-            assert_select "a[href=?]", contact_path
-          end
-        end
+_代码清单5.25: 测试布局中的链接 test/integration/site\_layout\_test.rb_
+
+    require 'test_helper'
+    class SiteLayoutTest < ActionDispatch::IntegrationTest
+      test "layout links" do
+        get root_path
+        asserttemplate 'static_pages/home'
+        assert_select "a[href=?]", root_path, count:2
+        assert_select "a[href=?]", help_path
+        assert_select "a[href=?]", about_path
+        assert_select "a[href=?]", contact_path
+      end
+    end
 
 # 5.4 用户注册
 
