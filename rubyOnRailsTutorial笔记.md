@@ -1159,22 +1159,104 @@ _代码清单5.25: 测试布局中的链接 test/integration/site\_layout\_test.
       end
     end
 
+_表5.2: assert\_select的一些用法_
+
+代码|匹配的HTML
+--|--
+assert\_select "div"|`<div>foobar</div>`
+assert\_select "div", "foobar"|`<div>foobar</div>`
+assert\_select "div.nav"|`<div class="nav">foobar</div>`
+assert\_select "div#profile"|`<div id="profile">foobar</div>`
+assert\_select "div[name=yo]"|`<div name="yo">hey</div>`
+assert\_select "a[href=?]", '/', count: 1 |` <a href="/">foo</a>`
+assert\_select "a[href=?]", '/', text: "foo"|` <a href="/">foo</a>`
+
+
+_代码清单5.26: 测试 略_
+
+_代码清单5.27: 测试 略_
+
+
 # 5.4 用户注册
 
 ## 5.4.1 用户控制器
 
 新建用户控制器, 控制器为大写复数
 
+_代码清单5.28: 生成用户控制器(包含new动作)_
+
     rails generate controller Users new
 
-用户控制器测试
+_代码清单5.29: 用户控制器测试 略_
 
+_代码清单5.30: 默认生成的用户控制器, 包含new动作 app/controllers/users\_controller.rb_
+
+    class UserController < ApplicationController
+
+      def new
+      end
+
+    end
+
+_代码清单5.31: 默认生成的new动作视图 app/views/users/new.html.erb_
+
+    <h1>User#new<h1>
+    <p>Find me in app/views/users/new.html.erb</p>
+
+_代码清单5.32: 新建用户页面的测试 test/controllers/users\_controller\_test.rb_
+
+    require 'test_helper'
+
+    class UsersControllerTest < ActionController::TestCase
+      test "should get new" do
+        get :new
+        assert_response :success
+      end
+    end
 
 ## 5.4.2 "注册"页面的URL
 
-新建用户分配具名路由
+_代码清单5.33: sign up页面的路由 config/routes.rb_
 
-    get 'signup' => 'users#new'
+    Rails.application.routes.draw do
+      root 'static_pages#home'
+      get 'help' => 'static_pages#help'
+      get 'about' => 'static_pages#about'
+      get 'contact' => 'static_pages#contact'
+      get 'signup' => 'users#new'
+    end
+
+_代码清单5.34: 使用按钮链接到signup页面 app/views/static\_pages/home.html.erb_
+
+    <div class="center jumbotron">
+        <h1>Welcome to the Sample App</h1>
+
+        <h2>
+            This is the home page for the <a href="http://www.railstutorial.org">Ruby on Rails Tutorial</a> sample application.
+        </h2>
+
+        <%= link_to "Sign up now!", signup_path, class: "btn btn-lg btn-primary"%>
+    </div>
+
+    <%= link_to image_tag("rails.png", alt: "Rails logo"), 'http://rubyonrails.org' %>
+
+_代码清单5.35: signup页面的临时视图 app/views/users/new.html.erb_
+
+    <% provide(:title, 'Sign up') %>
+    <h1>Sign up</h1>
+    <p>This will be a signup page for new users.</p>
+
+# 5.5 小结
+
+## 5.1.1 读完本章学到了什么
+
+* 使用HTML5可以定义一个包括LOGO, header, footer, 和body内容的网站布局
+* 为了使用起来方便, 可以使用Rails局部视图把部分结构放到单独的文件中
+* 在CSS中可以使用class和ID编写样式
+* Bootstrap框架能快速实现设计精美的网站
+* 使用Sass和Asset Pipeline能去除CSS中的重复, 还能打包静态文件, 提高在生产环境中的使用效率
+* 在Rails中可以自己定义路由规则, 得到具名路由
+* 继承测试能高效模拟浏览器中的点击操作
 
 # 5.6 练习
 1. 将css改写为scss
