@@ -1,0 +1,7 @@
+ venue_id |       name       |   street_address    |  type   | postal_code | country_code | active 
+----------+------------------+---------------------+---------+-------------+--------------+--------
+        1 | Crystal Ballroom |                     | public  | 97205       | us           | t
+        2 | Voodoo Donuts    |                     | public  | 97205       | us           | t
+        3 | Home             | South Fengzhou Road | public  | 010010      | cn           | t
+(3 rows)
+
