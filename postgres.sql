@@ -303,7 +303,8 @@ from events
 group by year, month;
 
 create temporary table month_count (month int);
-insert into month_count values (1), (2), (3), (4), (5), (6), (7), (8), (9), (10), (11), (12);
+insert into month_count
+values (select * from generate_series(1,12));
 
 select * from crosstab(
   'select extract (year from starts) as year,
