@@ -325,3 +325,22 @@ group by year, month',
   jan int, feb int, mar int, apr int, may int, jun int,
   jul int, aug int, sep int, oct int, nov int, dec int
 ) order by year;
+
+select * from crosstab(
+'select extract (year from starts) as year,
+extract (month  from starts) as month, count(*)
+from events
+group by year, month'
+) as  (
+  year int,
+  feb int, apr int, may int, aug int, dece int
+);
+
+select * from corsstab(
+'select extract (week from starts) as week,
+extract (day from starts) as day, count(*)
+from events
+group by week, day;'
+) as (
+  week
+);
