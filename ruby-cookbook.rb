@@ -58,3 +58,12 @@ def modes(array, find_all = true)
   end
   return modes ? modes[1..modes.size] : modes
 end
+
+require 'find'
+Find.find('./') do |path|
+  a = /([^0-9]*)([0-9]{6})([^0-9]*)/.match(path)
+  puts a[1], a[2], a[3] unless a == nil
+  File.rename(path, a[1]+"1"+a[3]) unless a == nil
+
+
+end
